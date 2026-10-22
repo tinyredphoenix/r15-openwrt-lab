@@ -1,0 +1,12 @@
+.cache/
+.work/
+artifacts/
+prototype/generated/
+__pycache__/
+*.pyc
+*.bin
+*.ipk
+*.tgz
+*.tar*
+*.log
+.env*

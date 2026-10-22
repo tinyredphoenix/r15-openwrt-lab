@@ -1,0 +1,49 @@
+name: R15 userspace research
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: r15-userspace-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  test-and-build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Local logic tests
+        run: |
+          python3 -m unittest discover -s prototype -v
+          python3 -m unittest discover -s tests -v
+          sh -n prototype/runtime/r15-radio-worker
+          bash -n build/build-userspace.sh
+      - name: Build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ccache file gawk gettext git \
+            libncurses-dev libssl-dev python3 python3-setuptools rsync swig \
+            unzip zlib1g-dev qemu-user patch
+      - name: Restore SDK and package cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .cache
+          key: r15-sdk-ubuntu22-v1-${{ hashFiles('build/pins.env', 'build/userspace.config', 'patches/*', 'build/build-userspace.sh') }}
+          restore-keys: |
+            r15-sdk-ubuntu22-v1-
+      - name: Compile and emulate userspace tools
+        run: bash build/build-userspace.sh
+      - name: Upload research outputs and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r15-userspace-research-${{ github.sha }}
+          path: |
+            artifacts/
+            .cache/sdk/logs/
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,46 @@
+# D-Link R15 A1 OpenWrt research
+
+Work toward a minimal cross-radio wireless repeater for the Indian R15 A1, with wired management independent of the Wi-Fi uplink. **No bootable or flashable R15 firmware is available here. Do not upload these artifacts to a router.**
+
+Observed stock firmware 1.06.10 uses RTL8198D, big-endian MIPS interAptiv, Linux 4.4.140; RTL8852AE (`wlan0`, PCI 10ec:8852) and RTL8192FE (`wlan1`, PCI 10ec:818c). Both create VXD client interfaces. Physical RAM capacity is not established. These observations do not establish OpenWrt driver compatibility.
+
+## What is implemented
+
+- A local configuration renderer with separate wired management, SSH keys and DHCP that does not replace the laptop's Internet route.
+- A radio worker with separate AP and supplicant supervision, netifd uplink attachment after association, disconnect cleanup and reconnect handling. It does not restart wired management.
+- A pinned Linux SDK build for `wpad-basic`, `wpa-cli` and `hostapd-utils`, including the RTL8192CD association-response patch from the Mercusys community port.
+- GitHub Actions caches the SDK/compiler and dependency build tree. The compiler is the official OpenWrt 21.02.7 `realtek/generic` MIPS big-endian userspace SDK, **not an R15 board target**.
+
+The build verifies SDK SHA-256, configuration retention, ELF32 big-endian MIPS output, the compiled association-response marker, and tool version execution using QEMU user emulation. It produces IPKs, source archives and a partial userspace tree. **QEMU version tests do not test Wi-Fi, Ethernet, booting or recovery.** Kernel modules and router image packaging are excluded.
+
+The old userspace baseline is an integration experiment with a vendor 4.4 kernel, not a maintained production release. No credentials, settings exports, owner logs, calibration tables or stock/vendor binaries belong in this repository or Actions cache.
+
+## Run
+
+Local logic checks (Python 3.9+):
+
+```sh
+python3 -m unittest discover -s prototype -v
+python3 -m unittest discover -s tests -v
+```
+
+Build on x86-64 Linux, or run **Actions → R15 userspace research → Run workflow**:
+
+```sh
+bash build/build-userspace.sh
+```
+
+The SDK download is about 82 MiB; expanded compiler, dependencies and sources need additional disk space. The workflow uses a standard Ubuntu runner and caches `.cache/`; no self-hosted runner, secret or paid runner is required. Download artifacts from the completed Actions run. Artifacts remain research-only even if all build checks pass.
+
+## What still blocks firmware
+
+R15 board initialization and per-unit MAC/calibration handling; complete runtime flash/UBI map; kernel/driver/userspace compatibility; watchdog boot acknowledgement; actual wired management boot testing; owner SSH provisioning; and independently verified bootloader recovery. D-Link's GPL README provides a recovery-entry recipe, but restoration on the actual unit has not been demonstrated. No firmware write is implemented by this project.
+
+## References and licensing
+
+- [Official SDK and checksum](https://downloads.openwrt.org/releases/21.02.7/targets/realtek/generic/)
+- [Pinned OpenWrt 21.02.7 source](https://github.com/openwrt/openwrt/tree/57a6d97ddf8f6541a52e0f8fad8c6f47685a1bc3)
+- [Mercusys vendor-kernel/OpenWrt userspace port](https://github.com/adaasch/mr1500x-openwrt), including the related `rtl8192cd` association-response integration. Its router images are incompatible with the R15.
+- [RTL960X OpenWrt platform work](https://github.com/jameywine/openwrt/tree/rtl9607c-dev), relevant to a future modern-kernel route; not proof of R15 radio support.
+
+Original project glue is MIT licensed; imported hostapd patch retains BSD-3-Clause terms. See `LICENSE` and `patches/NOTICE.md`. Downloaded OpenWrt sources and packages retain their own licenses. This project is not affiliated with D-Link, Realtek, OpenWrt or the reference port's authors.

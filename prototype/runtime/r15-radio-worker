@@ -1,0 +1,99 @@
+#!/bin/sh
+# R15 research runtime component. Requires board/driver/calibration startup first.
+# No flash, module loading, switch programming, or management writes occur here.
+
+rlog() { logger -t r15-radio "$1"; }
+management_up() {
+    ubus -t 2 call network.interface.mgmt status 2>/dev/null |
+        jsonfilter -e '@.up' 2>/dev/null | grep -qx true
+}
+valid_pair() {
+    case "$AP:$STA" in
+        wlan1:wlan0-vxd|wlan0:wlan1-vxd) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+detach_uplink() {
+    [ "$ATTACHED" = 1 ] || return 0
+    # Never call network restart, wifi reload, or ifdown on mgmt/lan.
+    ifdown wwan >/dev/null 2>&1
+    ubus -t 2 call network.interface.wwan remove_device \
+        "{\"name\":\"$STA\"}" >/dev/null 2>&1
+    ATTACHED=0
+}
+handle_link() {
+    # The caller supplies only a boolean, never SSID/key data.
+    if [ "$1" != connected ] || ! management_up; then
+        detach_uplink
+        return 0
+    fi
+    [ "$ATTACHED" = 0 ] || return 0
+    if ! ubus -t 2 call network.interface.wwan add_device \
+        "{\"name\":\"$STA\"}" >/dev/null 2>&1; then
+        rlog 'Could not attach Wi-Fi uplink; will retry'
+        return 1
+    fi
+    ATTACHED=1
+    if ! ifup wwan >/dev/null 2>&1; then
+        detach_uplink
+        rlog 'Could not start uplink DHCP; will retry'
+        return 1
+    fi
+    rlog 'Wi-Fi associated; uplink handed to netifd'
+}
+cleanup() {
+    trap - EXIT INT TERM
+    [ -z "$CHILD" ] || kill "$CHILD" 2>/dev/null
+    [ -z "$CHILD" ] || wait "$CHILD" 2>/dev/null
+    [ "$ROLE" != sta ] || detach_uplink
+}
+preflight() {
+    valid_pair || { rlog 'Unsupported radio pair'; return 1; }
+    management_up || { rlog 'Wired management is not ready'; return 1; }
+    [ -e "/sys/class/net/$AP" ] && [ -e "/sys/class/net/$STA" ] || {
+        rlog 'Board-created radio interfaces are missing'; return 1;
+    }
+    # Board startup, outside this service, must initialize switch, MACs and RF data.
+    [ -f /etc/r15/board-startup-verified ] || {
+        rlog 'Board startup has not been validated'; return 1;
+    }
+}
+main() {
+    ROLE=$1; AP=$2; STA=$3; CHILD=; ATTACHED=0
+    case "$ROLE" in ap|sta) ;; *) return 2 ;; esac
+    preflight || return 1
+    trap cleanup EXIT
+    trap 'exit 0' INT TERM
+    case "$ROLE" in
+    ap)
+        [ -r /etc/r15/hostapd.conf ] || return 1
+        hostapd /etc/r15/hostapd.conf &
+        CHILD=$!
+        wait "$CHILD"
+        result=$?
+        CHILD=
+        return "$result"
+        ;;
+    sta)
+        [ -r /etc/r15/wpa_supplicant.conf ] || return 1
+        # procd supervises this worker; do not use supplicant -B.
+        wpa_supplicant -Dnl80211 -i "$STA" -c /etc/r15/wpa_supplicant.conf &
+        CHILD=$!
+        while kill -0 "$CHILD" 2>/dev/null; do
+            if wpa_cli -p /var/run/r15-wpa -i "$STA" status 2>/dev/null |
+                grep -qx 'wpa_state=COMPLETED'; then
+                handle_link connected || :
+            else
+                handle_link disconnected
+            fi
+            sleep 5
+        done
+        wait "$CHILD"
+        result=$?
+        CHILD=
+        return "$result"
+        ;;
+    esac
+}
+# Source-only mode supports offline command-mock tests; normal use runs main.
+[ "${R15_SOURCE_ONLY:-0}" = 1 ] || main "$@"

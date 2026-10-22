@@ -1,0 +1,27 @@
+{
+  "device": "dlink-r15-a1",
+  "country": "IN",
+  "management": {
+    "address": "192.168.77.1/24",
+    "wired_ports": [
+      "eth0.3.0"
+    ],
+    "ssh_authorized_keys": []
+  },
+  "known_upstream_subnets": [],
+  "upstream": {
+    "band": "5g",
+    "interface": "wlan0-vxd",
+    "ssid": "EXAMPLE-TENDA",
+    "key": "EXAMPLE-ONLY-change-before-use"
+  },
+  "downstream": {
+    "band": "2g",
+    "interface": "wlan1",
+    "address": "192.168.78.1/24",
+    "ssid": "EXAMPLE-R15",
+    "key": "EXAMPLE-ONLY-change-before-use",
+    "channel": 6
+  },
+  "evidence": "Stock interface names observed in owner boot log; custom boot and physical port mapping untested."
+}

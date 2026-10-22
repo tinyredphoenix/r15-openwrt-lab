@@ -1,0 +1,24 @@
+{
+  "device": "dlink-r15-a1",
+  "country": "IN",
+  "management": {
+    "address": "192.168.77.1/24",
+    "wired_ports": ["unverified0"],
+    "ssh_authorized_keys": []
+  },
+  "known_upstream_subnets": [],
+  "upstream": {
+    "band": "5g",
+    "interface": "unverified1",
+    "ssid": "EXAMPLE-TENDA",
+    "key": "EXAMPLE-ONLY-change-before-use"
+  },
+  "downstream": {
+    "band": "2g",
+    "interface": "unverified2",
+    "address": "192.168.78.1/24",
+    "ssid": "EXAMPLE-R15",
+    "key": "EXAMPLE-ONLY-change-before-use",
+    "channel": 6
+  }
+}

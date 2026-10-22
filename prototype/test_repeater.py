@@ -1,0 +1,134 @@
+"""Offline tests of isolation, configuration encoding and unsafe-profile rejection."""
+import base64
+import copy
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+
+from r15_repeater import psk, render
+
+
+ROOT = Path(__file__).resolve().parent
+
+
+class RepeaterTests(unittest.TestCase):
+    def setUp(self):
+        self.profile = json.loads((ROOT / "profile.example.json").read_text())
+
+    def test_management_survives_missing_or_broken_radio_configuration(self):
+        wired, _ = render(self.profile, "wired-first")
+        broken = copy.deepcopy(self.profile)
+        del broken["upstream"]
+        broken["downstream"] = {"invalid": "radio setup must not gate wired access"}
+        other, _ = render(broken, "wired-first")
+        self.assertEqual(wired, other)
+        self.assertFalse(any(p.startswith("radio-config/") for p in wired))
+
+    def test_repeater_changes_do_not_change_management_or_ssh(self):
+        first, _ = render(self.profile, "repeater")
+        self.profile["upstream"].update(ssid="Other Tenda", key="different-password")
+        self.profile["downstream"].update(ssid="Other R15", channel=11)
+        second, _ = render(self.profile, "repeater")
+        for name in ("network", "firewall", "dhcp", "dropbear", "wireless"):
+            self.assertEqual(first["openwrt-config/" + name], second["openwrt-config/" + name])
+        self.assertIn("option Interface 'mgmt'", first["openwrt-config/dropbear"])
+        firewall = first["openwrt-config/firewall"]
+        self.assertIn("option src 'lan'\n\toption dest 'wwan'", firewall)
+        self.assertNotIn("option dest 'mgmt'", firewall)
+
+    def test_management_port_cannot_be_reused_for_wifi(self):
+        self.profile["upstream"]["interface"] = "unverified0"
+        with self.assertRaisesRegex(ValueError, "management"):
+            render(self.profile, "repeater")
+
+    def test_wired_dhcp_instance_has_no_radio_network_dependency(self):
+        wired, _ = render(self.profile, "wired-first")
+        radio, _ = render(self.profile, "repeater")
+        dhcp = wired["openwrt-config/dhcp"]
+        self.assertIn("option instance 'mgmt_dns'", dhcp)
+        self.assertNotIn("'lan'", dhcp)
+        self.assertNotIn("'wwan'", dhcp)
+        self.assertTrue(radio["openwrt-config/dhcp"].startswith(dhcp))
+        self.assertIn("option instance 'lan_dns'", radio["openwrt-config/dhcp"])
+
+    def test_reject_subnet_conflicts_and_dhcp_router_collision(self):
+        for change in ("downstream", "upstream", "dhcp"):
+            with self.subTest(change=change):
+                profile = copy.deepcopy(self.profile)
+                if change == "downstream":
+                    profile["downstream"]["address"] = "192.168.77.2/24"
+                elif change == "upstream":
+                    profile["known_upstream_subnets"] = ["192.168.77.0/24"]
+                else:
+                    profile["management"]["address"] = "192.168.77.100/24"
+                with self.assertRaises(ValueError):
+                    render(profile, "repeater")
+
+    def test_reject_same_radio_and_command_injection(self):
+        for change in ("same-radio", "ifname", "password-newline", "ap-channel"):
+            with self.subTest(change=change):
+                profile = copy.deepcopy(self.profile)
+                if change == "same-radio":
+                    profile["upstream"]["band"] = profile["downstream"]["band"]
+                elif change == "ifname":
+                    profile["upstream"]["interface"] = "wlan0;reboot"
+                elif change == "password-newline":
+                    profile["upstream"]["key"] = "password\nnetwork={"
+                else:
+                    profile["downstream"]["channel"] = "6\ninterface=br-mgmt"
+                with self.assertRaises(ValueError):
+                    render(profile, "repeater")
+
+    def test_psk_matches_known_wpa_vector(self):
+        # Published IEEE/password WPA-PSK vector; independent of rendering.
+        self.assertEqual(psk("IEEE", "password"),
+                         "f42c6fc52df0ebef9ebb4b90b38a5f902e83fe1b135a70e23aed762e9710a12e")
+
+    def test_ssid_directive_injection_is_encoded_as_data(self):
+        name = 'quote"\ninterface=br-mgmt'
+        self.profile["downstream"]["ssid"] = name
+        files, _ = render(self.profile, "repeater")
+        config = files["radio-config/hostapd.conf"]
+        self.assertIn("ssid2=" + name.encode().hex() + "\n", config)
+        self.assertNotIn("\ninterface=br-mgmt", config)
+        for content in files.values():
+            self.assertNotIn(self.profile["upstream"]["key"], content)
+
+    def test_valid_public_key_and_no_secret_requirement_in_wired_stage(self):
+        wire = bytes.fromhex("0000000b") + b"ssh-ed25519" + bytes.fromhex("00000020") + bytes(range(32))
+        key = "ssh-ed25519 " + base64.b64encode(wire).decode() + " test-only"
+        self.profile["management"]["ssh_authorized_keys"] = [key]
+        files, manifest = render(self.profile, "wired-first")
+        self.assertEqual(files["dropbear/authorized_keys"], key + "\n")
+        self.assertFalse(any("public key" in x for x in manifest["blockers"]))
+        self.profile["management"]["ssh_authorized_keys"] = ["ssh-ed25519 invalid"]
+        with self.assertRaises(ValueError):
+            render(self.profile, "wired-first")
+
+    def test_output_is_private_hashed_and_refuses_overwrite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "review"
+            cmd = [sys.executable, str(ROOT / "r15_repeater.py"), "--profile",
+                   str(ROOT / "profile.example.json"), "--stage", "repeater", "--output", str(target)]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+            manifest = json.loads((target / "manifest.json").read_text())
+            self.assertIs(manifest["flashable"], False)
+            self.assertIs(manifest["installable_overlay"], False)
+            self.assertTrue(manifest["blockers"])
+            for name, entry in manifest["files"].items():
+                path = target / name
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+                self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), entry["sha256"])
+            before = (target / "manifest.json").read_bytes()
+            self.assertEqual(subprocess.run(cmd, capture_output=True).returncode, 2)
+            self.assertEqual(before, (target / "manifest.json").read_bytes())
+
+
+if __name__ == "__main__":
+    unittest.main()
