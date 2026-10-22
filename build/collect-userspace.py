@@ -3,6 +3,8 @@ import hashlib
 import io
 import json
 import os
+import re
+from email.parser import Parser
 from pathlib import Path, PurePosixPath
 import shutil
 import struct
@@ -56,6 +58,37 @@ def ipk_payload(path):
     raise ValueError('No package payload: ' + str(path))
 
 
+def ipk_metadata(path):
+    with tarfile.open(path, mode='r:*') as outer:
+        member = next(m for m in outer if PurePosixPath(m.name).name == 'control.tar.gz')
+        payload = outer.extractfile(member).read()
+    with tarfile.open(fileobj=io.BytesIO(payload), mode='r:*') as inner:
+        member = next(m for m in inner if PurePosixPath(m.name).name == 'control')
+        return dict(Parser().parsestr(inner.extractfile(member).read().decode()).items())
+
+
+def dependency_closure(metadata, roots):
+    providers = {name: name for name in metadata}
+    for name, fields in metadata.items():
+        for alias in fields.get('Provides', '').split(','):
+            alias = alias.strip().split(' ')[0]
+            if alias:
+                providers.setdefault(alias, name)
+    selected = set()
+    pending = list(roots)
+    while pending:
+        requested = pending.pop()
+        alternatives = [re.sub(r'\s*\([^)]*\)', '', p).strip() for p in requested.split('|')]
+        name = next((providers[x] for x in alternatives if x in providers), None)
+        if name is None:
+            raise ValueError('Missing runtime dependency: ' + requested)
+        if name in selected:
+            continue
+        selected.add(name)
+        pending.extend(p.strip() for p in metadata[name].get('Depends', '').split(',') if p.strip())
+    return selected
+
+
 def inspect_elf(data):
     if not data.startswith(b'\x7fELF'):
         return None
@@ -73,6 +106,8 @@ def collect(sdk, output):
     packages.mkdir()
     records = []
     seen = {}
+    available = {}
+    metadata = {}
     for package in sorted((sdk / 'bin').rglob('*.ipk')):
         if package.name.startswith(('kmod-', 'kernel_')):
             continue
@@ -82,9 +117,21 @@ def collect(sdk, output):
                 raise ValueError('Conflicting package: ' + package.name)
             continue
         seen[package.name] = digest
+        fields = ipk_metadata(package)
+        name = fields['Package']
+        if name in available:
+            raise ValueError('Multiple versions of package: ' + name)
+        available[name] = package
+        metadata[name] = fields
+    selected = dependency_closure(metadata, ['wpad-basic', 'wpa-cli', 'hostapd-utils'])
+    for name in sorted(selected):
+        package = available[name]
+        digest = seen[package.name]
         shutil.copyfile(package, packages / package.name)
         unpack_data(ipk_payload(package), root)
-        records.append({'name': package.name, 'bytes': package.stat().st_size, 'sha256': digest})
+        records.append({'name': package.name, 'bytes': package.stat().st_size, 'sha256': digest,
+                        'license': metadata[name].get('License'),
+                        'depends': metadata[name].get('Depends', '')})
     for prefix in ('wpad-basic_', 'wpa-cli_', 'hostapd-utils_', 'libc_'):
         if not any(p['name'].startswith(prefix) for p in records):
             raise ValueError('Missing compiled package: ' + prefix)
@@ -112,6 +159,8 @@ def collect(sdk, output):
               'sdk_target': 'realtek/generic', 'package_architecture': 'mips_4kec',
               'soc_compatibility': 'ISA candidate for RTL8198D; driver/runtime compatibility unverified',
               'association_patch_marker_present': True, 'packages': records, 'elf_files': elf}
+    result['regular_file_bytes'] = sum(p.stat().st_size for p in root.rglob('*')
+                                       if p.is_file() and not p.is_symlink())
     (output / 'build-report.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps({'packages': len(records), 'mips_elf_files': len(elf), 'flashable': False}))
 

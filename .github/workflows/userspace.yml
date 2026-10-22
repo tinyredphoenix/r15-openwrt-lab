@@ -29,14 +29,21 @@ jobs:
             libncurses-dev libssl-dev python3 python3-setuptools rsync swig \
             unzip zlib1g-dev qemu-user patch
       - name: Restore SDK and package cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        id: sdk-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: .cache
-          key: r15-sdk-ubuntu22-v1-${{ hashFiles('build/pins.env', 'build/userspace.config', 'patches/*', 'build/build-userspace.sh') }}
+          key: r15-sdk-ubuntu22-v1-${{ hashFiles('build/pins.env') }}-${{ github.sha }}
           restore-keys: |
-            r15-sdk-ubuntu22-v1-
+            r15-sdk-ubuntu22-v1-${{ hashFiles('build/pins.env') }}-
       - name: Compile and emulate userspace tools
         run: bash build/build-userspace.sh
+      - name: Save SDK and dependency work even after a later failure
+        if: always() && steps.sdk-cache.outputs.cache-primary-key != '' && steps.sdk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .cache
+          key: ${{ steps.sdk-cache.outputs.cache-primary-key }}
       - name: Upload research outputs and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

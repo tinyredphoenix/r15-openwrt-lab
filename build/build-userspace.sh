@@ -43,12 +43,28 @@ make -C "$SDK" package/network/services/hostapd/clean
 make -C "$SDK" package/toolchain/compile -j2 V=s
 make -C "$SDK" package/network/services/hostapd/compile -j2 V=s
 python3 "$ROOT/build/collect-userspace.py" "$SDK" "$ROOT/artifacts"
+# This hostapd version intentionally exits 1 for -v (hostapd/main.c).
+# Require both that exact status and its expected output, not a blanket || true.
+status=0
 qemu-mips -L "$ROOT/artifacts/rootfs" "$ROOT/artifacts/rootfs/usr/sbin/hostapd" -v \
-    > "$ROOT/artifacts/hostapd-version.txt" 2>&1
+    > "$ROOT/artifacts/hostapd-version.txt" 2>&1 || status=$?
+[[ "$status" == 1 ]]
+grep -q '^hostapd v' "$ROOT/artifacts/hostapd-version.txt"
 qemu-mips -L "$ROOT/artifacts/rootfs" "$ROOT/artifacts/rootfs/usr/sbin/wpa_supplicant" -v \
     > "$ROOT/artifacts/supplicant-version.txt" 2>&1
 qemu-mips -L "$ROOT/artifacts/rootfs" "$ROOT/artifacts/rootfs/usr/sbin/wpa_cli" -v \
     > "$ROOT/artifacts/wpa-cli-version.txt" 2>&1
+grep -q '^wpa_supplicant v' "$ROOT/artifacts/supplicant-version.txt"
+grep -q '^wpa_cli v' "$ROOT/artifacts/wpa-cli-version.txt"
+python3 - "$ROOT/artifacts/build-report.json" <<'PY'
+import json, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+report = json.loads(p.read_text())
+report['qemu_version_checks'] = {'hostapd': 'pass (expected exit 1)',
+                                  'wpa_supplicant': 'pass', 'wpa_cli': 'pass'}
+p.write_text(json.dumps(report, indent=2) + '\n')
+PY
 cp "$SDK/.config" "$ROOT/artifacts/sdk.config"
 cp "$ROOT/build/pins.env" "$ROOT/artifacts/pins.env"
 printf '%s\n' 'USERSPACE RESEARCH ONLY. NOT FIRMWARE. DO NOT FLASH.' \

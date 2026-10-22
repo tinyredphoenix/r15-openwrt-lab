@@ -11,6 +11,17 @@ m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
 
 class CollectorTests(unittest.TestCase):
+    def test_closure_excludes_unrequested_packages_and_resolves_abi_aliases(self):
+        packages = {'wpad': {'Depends': 'libc, libubus (>= 1)'},
+                    'libc': {}, 'libubus20210630': {'Provides': 'libubus', 'Depends': 'libc'},
+                    'openssl': {}}
+        self.assertEqual(m.dependency_closure(packages, ['wpad']),
+                         {'wpad', 'libc', 'libubus20210630'})
+
+    def test_missing_dependency_prevents_incomplete_artifact(self):
+        with self.assertRaisesRegex(ValueError, 'Missing runtime dependency'):
+            m.dependency_closure({'wpad': {'Depends': 'missing-lib'}}, ['wpad'])
+
     def test_foreign_or_truncated_elf_rejected(self):
         data = bytearray(52)
         data[:6] = b'\x7fELF\x01\x02'
