@@ -28,9 +28,14 @@ fi
 [[ $(git -C "$SOURCE" rev-parse HEAD) == "$OPENWRT_COMMIT" ]]
 # SDK supplies the compiler and staged headers. Matching source supplies core
 # package recipes; no feeds tracking a moving branch are used.
-cp -a "$SOURCE/package/." "$SDK/package/"
-cp "$ROOT/patches/900-rtl8192cd-sta-assoc-reply.patch" \
-    "$SDK/package/network/services/hostapd/patches/"
+# Preserve mtimes of unchanged recipes so test-only commits do not rebuild them.
+rsync -rcpl "$SOURCE/package/" "$SDK/package/"
+PATCH_CHANGED=0
+PATCH_TARGET="$SDK/package/network/services/hostapd/patches/900-rtl8192cd-sta-assoc-reply.patch"
+if ! cmp -s "$ROOT/patches/900-rtl8192cd-sta-assoc-reply.patch" "$PATCH_TARGET"; then
+    cp "$ROOT/patches/900-rtl8192cd-sta-assoc-reply.patch" "$PATCH_TARGET"
+    PATCH_CHANGED=1
+fi
 cp "$ROOT/build/userspace.config" "$SDK/.config"
 make -C "$SDK" defconfig
 for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
@@ -41,8 +46,11 @@ for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
     CONFIG_PACKAGE_jsonfilter=y CONFIG_DROPBEAR_ED25519=y; do
     grep -qx "$symbol" "$SDK/.config" || { echo "Missing build setting: $symbol" >&2; exit 1; }
 done
-# Rebuild patched wpad; retain compiler, downloads and dependency builds in cache.
-make -C "$SDK" package/network/services/hostapd/clean
+# Invalidate wpad only when the added patch changes. OpenWrt tracks configuration
+# changes itself; the artifact collector independently checks the compiled marker.
+if [[ "$PATCH_CHANGED" == 1 ]]; then
+    make -C "$SDK" package/network/services/hostapd/clean
+fi
 make -C "$SDK" package/toolchain/compile -j2 V=s
 make -C "$SDK" package/network/services/hostapd/compile -j2 V=s
 for package in utils/busybox system/procd system/ubox system/ubus system/uci \
