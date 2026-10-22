@@ -44,6 +44,6 @@ jobs:
           name: r15-userspace-research-${{ github.sha }}
           path: |
             artifacts/
-            .cache/sdk/logs/
+            .cache/sdk-*/logs/
           if-no-files-found: warn
           retention-days: 14

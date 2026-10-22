@@ -7,7 +7,7 @@ source "$ROOT/build/pins.env"
     echo 'This pinned SDK requires x86-64 Linux. Use the Actions workflow.' >&2; exit 2;
 }
 CACHE="$ROOT/.cache"
-SDK="$CACHE/sdk"
+SDK="$CACHE/sdk-${SDK_SHA256:0:16}"
 SOURCE="$ROOT/.work/openwrt-source"
 mkdir -p "$CACHE" "$ROOT/.work" "$ROOT/artifacts"
 if [[ ! -f "$CACHE/$SDK_NAME" ]]; then
