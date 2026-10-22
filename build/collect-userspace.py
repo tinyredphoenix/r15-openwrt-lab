@@ -157,6 +157,10 @@ def collect(sdk, output):
     for path in sorted((sdk / 'dl').glob('*')):
         if path.is_file() and not path.name.startswith('.'):
             shutil.copyfile(path, sources / path.name)
+    # Preserve distribution recipe/patch changes alongside upstream archives.
+    # In particular, a BusyBox upstream tarball alone omits OpenWrt's patches.
+    with tarfile.open(sources / 'openwrt-package-recipes.tar.gz', 'w:gz') as archive:
+        archive.add(sdk / 'package', arcname='package')
     result = {'flashable': False, 'hardware_tested': False,
               'scope': 'Wireless and management userspace; no board boot integration or kernel',
               'sdk_target': 'realtek/generic', 'package_architecture': 'mips_4kec',

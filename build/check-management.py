@@ -23,6 +23,9 @@ def check(root, output):
         if applet not in applets:
             raise RuntimeError('Required BusyBox applet missing: ' + applet)
     checks['busybox_required_applets'] = ['ash', 'ip', 'udhcpc']
+    repository = Path(__file__).resolve().parents[1]
+    invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-radio-worker'])
+    checks['radio_worker_busybox_syntax'] = 'pass'
     dropbear = invoke(root, 'usr/sbin/dropbear', ['-V'], accepted=(0, 1))
     if 'Dropbear v' not in dropbear.stdout + dropbear.stderr:
         raise RuntimeError('Missing Dropbear version output')
@@ -44,7 +47,6 @@ def check(root, output):
         if not any(line.startswith('ssh-ed25519 ') for line in public.splitlines()):
             raise RuntimeError('Ed25519 key generation/public-key export failed')
         checks['ed25519_generation'] = 'pass; temporary test key deleted, not published'
-        repository = Path(__file__).resolve().parents[1]
         spec = importlib.util.spec_from_file_location('renderer', repository / 'prototype/r15_repeater.py')
         renderer = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(renderer)
