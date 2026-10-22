@@ -1,0 +1,62 @@
+#!/bin/sh
+# Read-only facts. No network requests, GPIO writes, mounts, flash or reboot.
+ROOT=
+case "${1:-}" in
+    '') ;;
+    --root) [ "$#" = 2 ] || exit 2; ROOT=${2%/} ;;
+    *) exit 2 ;;
+esac
+number() {
+    key=$1; file=$2; value=
+    if [ -r "$ROOT$file" ]; then IFS= read -r value < "$ROOT$file" || :; fi
+    case "$value" in ''|*[!0-9]*) value=unknown ;; esac
+    printf '%s=%s\n' "$key" "$value"
+}
+printf 'format=r15-health-v1\nassessment=observations-only\n'
+seconds=; idle=
+if [ -r "$ROOT/proc/uptime" ]; then read -r seconds idle < "$ROOT/proc/uptime" || :; fi
+case "$seconds" in ''|*[!0-9.]*) seconds=unknown ;; esac
+printf 'uptime_seconds=%s\n' "$seconds"
+if [ -r "$ROOT/proc/meminfo" ]; then
+    while read -r name value unit; do
+        case "$name" in
+            MemTotal:|MemFree:|MemAvailable:|Buffers:|Cached:)
+                case "$value" in ''|*[!0-9]*) value=unknown ;; esac
+                printf 'memory.%s_kib=%s\n' "${name%:}" "$value"
+                ;;
+        esac
+    done < "$ROOT/proc/meminfo"
+fi
+for dev in eth0.2 eth0.3.0 eth0.4.0 eth0.5.0 br-mgmt wlan0 wlan0-vxd wlan1 wlan1-vxd; do
+    base="/sys/class/net/$dev"
+    if [ ! -d "$ROOT$base" ]; then
+        printf 'net.%s.present=no\n' "$dev"
+        continue
+    fi
+    printf 'net.%s.present=yes\n' "$dev"
+    number "net.$dev.carrier" "$base/carrier"
+    for counter in rx_bytes tx_bytes rx_errors tx_errors; do
+        number "net.$dev.$counter" "$base/statistics/$counter"
+    done
+done
+led_count=0
+for led in "$ROOT"/sys/class/leds/*; do
+    [ -d "$led" ] || continue
+    led_count=$((led_count + 1))
+done
+printf 'led.exposed_devices=%s\nled.board_mapping=unverified\n' "$led_count"
+sensors=0
+for hwmon in "$ROOT"/sys/class/hwmon/hwmon*; do
+    [ -d "$hwmon" ] || continue
+    for input in "$hwmon"/in*_input; do
+        [ -r "$input" ] || continue
+        sensors=$((sensors + 1))
+        number "power.sensor${sensors}_raw_mv" "${input#"$ROOT"}"
+    done
+done
+if [ "$sensors" = 0 ]; then
+    printf 'power.voltage_monitor=not-exposed\n'
+else
+    printf 'power.voltage_monitor=available-unclassified\n'
+fi
+printf 'power.supply_integrity=unknown\nradio.antenna_chains=not-validated\n'

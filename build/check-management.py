@@ -29,6 +29,8 @@ def check(root, output):
     repository = Path(__file__).resolve().parents[1]
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-radio-worker'])
     checks['radio_worker_busybox_syntax'] = 'pass'
+    invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-health'])
+    checks['health_probe_busybox_syntax'] = 'pass'
     dropbear = invoke(root, 'usr/sbin/dropbear', ['-V'], accepted=(0, 1))
     if 'Dropbear v' not in dropbear.stdout + dropbear.stderr:
         raise RuntimeError('Missing Dropbear version output')
