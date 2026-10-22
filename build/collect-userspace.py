@@ -11,6 +11,9 @@ import struct
 import sys
 import tarfile
 
+ROOT_PACKAGES = ['wpad-basic', 'wpa-cli', 'hostapd-utils', 'busybox', 'procd',
+                 'ubox', 'logd', 'ubus', 'ubusd', 'uci', 'netifd', 'dropbear',
+                 'dnsmasq', 'jsonfilter']
 
 def safe_path(root, name):
     path = PurePosixPath(name)
@@ -123,7 +126,7 @@ def collect(sdk, output):
             raise ValueError('Multiple versions of package: ' + name)
         available[name] = package
         metadata[name] = fields
-    selected = dependency_closure(metadata, ['wpad-basic', 'wpa-cli', 'hostapd-utils'])
+    selected = dependency_closure(metadata, ROOT_PACKAGES)
     for name in sorted(selected):
         package = available[name]
         digest = seen[package.name]
@@ -155,10 +158,13 @@ def collect(sdk, output):
         if path.is_file() and not path.name.startswith('.'):
             shutil.copyfile(path, sources / path.name)
     result = {'flashable': False, 'hardware_tested': False,
-              'scope': 'Wireless userspace tools only; no kernel or board image',
+              'scope': 'Wireless and management userspace; no board boot integration or kernel',
               'sdk_target': 'realtek/generic', 'package_architecture': 'mips_4kec',
               'soc_compatibility': 'ISA candidate for RTL8198D; driver/runtime compatibility unverified',
               'association_patch_marker_present': True, 'packages': records, 'elf_files': elf}
+    result['root_packages'] = ROOT_PACKAGES
+    result['boot_framework_complete'] = False
+    result['excluded_board_files'] = 'SDK base-files is intentionally excluded: it targets RTL838x switches, not R15'
     result['regular_file_bytes'] = sum(p.stat().st_size for p in root.rglob('*')
                                        if p.is_file() and not p.is_symlink())
     (output / 'build-report.json').write_text(json.dumps(result, indent=2) + '\n')

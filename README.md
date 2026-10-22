@@ -8,10 +8,10 @@ Observed stock firmware 1.06.10 uses RTL8198D, big-endian MIPS interAptiv, Linux
 
 - A local configuration renderer with separate wired management, SSH keys and DHCP that does not replace the laptop's Internet route.
 - A radio worker with separate AP and supplicant supervision, netifd uplink attachment after association, disconnect cleanup and reconnect handling. It does not restart wired management.
-- A pinned Linux SDK build for `wpad-basic`, `wpa-cli` and `hostapd-utils`, including the RTL8192CD association-response patch from the Mercusys community port.
+- A pinned Linux SDK build for patched wireless tools and the management foundation: BusyBox, procd, ubus, UCI, netifd, Dropbear, dnsmasq and jsonfilter.
 - GitHub Actions caches the SDK/compiler and dependency build tree. The compiler is the official OpenWrt 21.02.7 `realtek/generic` MIPS big-endian userspace SDK, **not an R15 board target**.
 
-The build verifies SDK SHA-256, configuration retention, ELF32 big-endian MIPS output, the compiled association-response marker, and tool version execution using QEMU user emulation. It produces IPKs, source archives and a partial userspace tree. **QEMU version tests do not test Wi-Fi, Ethernet, booting or recovery.** Kernel modules and router image packaging are excluded.
+The build verifies SDK SHA-256, configuration retention, ELF32 big-endian MIPS output, the compiled association-response marker, and tool version execution using QEMU user emulation. It also exercises Ed25519 key generation, parses the rendered management UCI files, and checks dnsmasq syntax with default-route/DNS advertising disabled. Test keys are temporary and never published. No SSH or DHCP server is started by these checks. It produces IPKs, source archives and a partial userspace tree. **QEMU version tests do not test Wi-Fi, Ethernet, booting or recovery.** Kernel modules, router image packaging and the SDK target's unrelated board base-files are excluded. The partial tree lacks the R15 boot framework.
 
 The old userspace baseline is an integration experiment with a vendor 4.4 kernel, not a maintained production release. No credentials, settings exports, owner logs, calibration tables or stock/vendor binaries belong in this repository or Actions cache.
 
@@ -30,7 +30,7 @@ Build on x86-64 Linux, or run **Actions → R15 userspace research → Run workf
 bash build/build-userspace.sh
 ```
 
-The SDK download is about 82 MiB; expanded compiler, dependencies and sources need additional disk space. The workflow uses a standard Ubuntu runner and caches `.cache/`; no self-hosted runner, secret or paid runner is required. Download artifacts from the completed Actions run. Artifacts remain research-only even if all build checks pass.
+The SDK download is about 82 MiB; expanded compiler, dependencies and sources need additional disk space. The workflow uses a standard Ubuntu 24.04 runner and caches `.cache/`; no self-hosted runner, secret or paid runner is required. Download artifacts from the completed Actions run. Artifacts remain research-only even if all build checks pass.
 
 ## What still blocks firmware
 

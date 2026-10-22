@@ -35,13 +35,21 @@ cp "$ROOT/build/userspace.config" "$SDK/.config"
 make -C "$SDK" defconfig
 for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
     CONFIG_PACKAGE_hostapd-utils=y CONFIG_PACKAGE_kmod-cfg80211=y \
-    CONFIG_DRIVER_11N_SUPPORT=y CONFIG_DRIVER_11AC_SUPPORT=y; do
+    CONFIG_DRIVER_11N_SUPPORT=y CONFIG_DRIVER_11AC_SUPPORT=y \
+    CONFIG_PACKAGE_busybox=y CONFIG_PACKAGE_procd=y CONFIG_PACKAGE_netifd=y \
+    CONFIG_PACKAGE_uci=y CONFIG_PACKAGE_dropbear=y CONFIG_PACKAGE_dnsmasq=y \
+    CONFIG_PACKAGE_jsonfilter=y CONFIG_DROPBEAR_ED25519=y; do
     grep -qx "$symbol" "$SDK/.config" || { echo "Missing build setting: $symbol" >&2; exit 1; }
 done
 # Rebuild patched wpad; retain compiler, downloads and dependency builds in cache.
 make -C "$SDK" package/network/services/hostapd/clean
 make -C "$SDK" package/toolchain/compile -j2 V=s
 make -C "$SDK" package/network/services/hostapd/compile -j2 V=s
+for package in utils/busybox system/procd system/ubox system/ubus system/uci \
+    network/config/netifd network/services/dropbear network/services/dnsmasq \
+    utils/jsonfilter; do
+    make -C "$SDK" "package/$package/compile" -j2 V=s
+done
 python3 "$ROOT/build/collect-userspace.py" "$SDK" "$ROOT/artifacts"
 # This hostapd version intentionally exits 1 for -v (hostapd/main.c).
 # Require both that exact status and its expected output, not a blanket || true.
@@ -65,6 +73,7 @@ report['qemu_version_checks'] = {'hostapd': 'pass (expected exit 1)',
                                   'wpa_supplicant': 'pass', 'wpa_cli': 'pass'}
 p.write_text(json.dumps(report, indent=2) + '\n')
 PY
+python3 "$ROOT/build/check-management.py" "$ROOT/artifacts/rootfs" "$ROOT/artifacts"
 cp "$SDK/.config" "$ROOT/artifacts/sdk.config"
 cp "$ROOT/build/pins.env" "$ROOT/artifacts/pins.env"
 printf '%s\n' 'USERSPACE RESEARCH ONLY. NOT FIRMWARE. DO NOT FLASH.' \
