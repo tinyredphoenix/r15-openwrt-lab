@@ -1,6 +1,7 @@
 """Run bounded userspace-only checks under QEMU; start no network daemons."""
 import importlib.util
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -18,10 +19,12 @@ def invoke(root, program, args=(), *, input=None, accepted=(0,)):
 def check(root, output):
     root = root.resolve()
     checks = {}
-    applets = invoke(root, 'bin/busybox', ['--list']).stdout.splitlines()
-    for applet in ('ash', 'ip', 'udhcpc'):
-        if applet not in applets:
-            raise RuntimeError('Required BusyBox applet missing: ' + applet)
+    # OpenWrt's minimal BusyBox disables the optional --list/installer support.
+    # Dispatch the required applets themselves; --help starts no networking.
+    for applet in ('ip', 'udhcpc'):
+        result = invoke(root, 'bin/busybox', [applet, '--help'], accepted=(0, 1))
+        if not re.search(r'Usage:\s*' + applet + r'\b', result.stdout + result.stderr):
+            raise RuntimeError('Required BusyBox applet help unavailable: ' + applet)
     checks['busybox_required_applets'] = ['ash', 'ip', 'udhcpc']
     repository = Path(__file__).resolve().parents[1]
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-radio-worker'])
