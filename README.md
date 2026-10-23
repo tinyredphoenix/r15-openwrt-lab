@@ -35,6 +35,8 @@ bash build/build-userspace.sh
 
 The SDK download is about 82 MiB; expanded compiler, dependencies and sources need additional disk space. The workflow uses a standard Ubuntu 24.04 runner and caches `.cache/`; no self-hosted runner, secret or paid runner is required. Download artifacts from the completed Actions run. Artifacts remain research-only even if all build checks pass.
 
+For a small local download, run **Actions → Export compact research runtime** with a successful userspace run ID. It verifies the selected files against that run's checksum manifest on the cloud runner and exports only runtime packages, the userspace tarball and reports. Large source archives remain in the original build artifact; provenance links to that run. The compact output is also non-flashable.
+
 ## What still blocks firmware
 
 The [recovery and hardware acceptance requirements](requirements/RECOVERY-AND-HARDWARE.md) track wired failsafe, independent restoration to stock, safe firmware updates, power/watchdog behavior, LEDs, Ethernet, radio RX/TX, scanning, broadcasting and Wi-Fi security. These are pre-flash requirements, not completed hardware tests.

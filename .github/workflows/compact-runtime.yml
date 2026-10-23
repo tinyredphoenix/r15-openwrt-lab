@@ -1,0 +1,42 @@
+name: Export compact research runtime
+on:
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Successful userspace build run ID in this repository
+        required: true
+        default: '39907234822'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Fetch successful source outputs on the cloud runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.source_run }}
+        run: |
+          [[ "$SOURCE_RUN" =~ ^[1-9][0-9]*$ ]]
+          gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json status,conclusion,headSha > source-run.json
+          python3 - <<'PY'
+          import json
+          import re
+          d = json.load(open('source-run.json'))
+          assert d['status'] == 'completed' and d['conclusion'] == 'success'
+          assert re.fullmatch('[0-9a-f]{40}', d['headSha'])
+          PY
+          SOURCE_SHA=$(python3 -c 'import json; print(json.load(open("source-run.json"))["headSha"])')
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "r15-userspace-research-$SOURCE_SHA" --dir source
+          python3 build/compact-runtime.py source/artifacts compact --source-run "$SOURCE_RUN" --source-commit "$SOURCE_SHA"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r15-runtime-${{ inputs.source_run }}
+          path: compact/
+          if-no-files-found: error
+          retention-days: 14
