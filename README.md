@@ -9,6 +9,7 @@ Observed stock firmware 1.06.10 uses RTL8198D, big-endian MIPS interAptiv, Linux
 - A local configuration renderer with separate wired management, SSH keys and DHCP that does not replace the laptop's Internet route.
 - A radio worker with separate AP and supplicant supervision, netifd uplink attachment after association, disconnect cleanup and reconnect handling. It does not restart wired management.
 - A read-only health probe for uptime, memory, Ethernet/Wi-Fi packet counters, exposed LED devices and voltage sensors. Missing sensors remain unknown; LED control and antenna-chain testing still require board verification.
+- A read-only checker for the observed decrypted stock image's inner record lengths and checksums. It rejects corruption without claiming authenticity or flash compatibility; it always reports `flashable: false`.
 - A pinned Linux SDK build for patched wireless tools and the management foundation: BusyBox, procd, ubus, UCI, netifd, Dropbear, dnsmasq and jsonfilter.
 - GitHub Actions caches the SDK/compiler and dependency build tree. The compiler is the official OpenWrt 21.02.7 `realtek/generic` MIPS big-endian userspace SDK, **not an R15 board target**.
 
@@ -36,6 +37,8 @@ The SDK download is about 82 MiB; expanded compiler, dependencies and sources ne
 ## What still blocks firmware
 
 The [recovery and hardware acceptance requirements](requirements/RECOVERY-AND-HARDWARE.md) track wired failsafe, independent restoration to stock, safe firmware updates, power/watchdog behavior, LEDs, Ethernet, radio RX/TX, scanning, broadcasting and Wi-Fi security. These are pre-flash requirements, not completed hardware tests.
+
+The [stock boot-mechanism findings](requirements/STOCK-BOOT-MECHANISM.md) document paired logical kernel/rootfs sections, `sw_tryactive`/`sw_commit`, and the inner-record integrity checker. Bootloader rollback and the live flash layout remain unverified.
 
 R15 board initialization and per-unit MAC/calibration handling; complete runtime flash/UBI map; kernel/driver/userspace compatibility; watchdog boot acknowledgement; actual wired management boot testing; owner SSH provisioning; and independently verified bootloader recovery. D-Link's GPL README provides a recovery-entry recipe, but restoration on the actual unit has not been demonstrated. No firmware write is implemented by this project.
 
