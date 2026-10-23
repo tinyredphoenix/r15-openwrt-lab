@@ -19,6 +19,16 @@ class RepeaterTests(unittest.TestCase):
     def setUp(self):
         self.profile = json.loads((ROOT / "profile.example.json").read_text())
 
+    def test_rendered_subnet_policy_uses_normalized_local_networks(self):
+        files, _ = render(self.profile, "repeater")
+        import ipaddress
+        expected = [str(ipaddress.ip_interface(self.profile[x]["address"]).network)
+                    for x in ("management", "downstream")]
+        self.assertEqual(files["radio-config/protected-subnets"].splitlines(), expected)
+        self.assertIn("runtime/r15-subnet-check", files)
+        wired, _ = render(self.profile, "wired-first")
+        self.assertNotIn("runtime/r15-subnet-check", wired)
+
     def test_management_survives_missing_or_broken_radio_configuration(self):
         wired, _ = render(self.profile, "wired-first")
         broken = copy.deepcopy(self.profile)
@@ -90,6 +100,7 @@ class RepeaterTests(unittest.TestCase):
 
     def test_same_radio_uses_one_coordinator_and_pins_selected_bssid(self):
         profile = json.loads((ROOT / 'profile.same-radio.example.json').read_text())
+        profile['upstream']['bssid'] = '02:11:22:33:44:55'
         for band, ap, sta, channel in [('2g', 'wlan1', 'wlan1-vxd', 1),
                                        ('5g', 'wlan0', 'wlan0-vxd', 40)]:
             with self.subTest(band=band):
@@ -105,9 +116,24 @@ class RepeaterTests(unittest.TestCase):
                 self.assertFalse(manifest['flashable'])
                 self.assertFalse(manifest['installable_overlay'])
 
+    def test_same_radio_discovers_ssid_without_bssid_or_manual_channel(self):
+        profile = json.loads((ROOT / 'profile.same-radio.example.json').read_text())
+        profile['upstream'].pop('bssid', None)
+        profile['downstream'].pop('channel', None)
+        files, _ = render(profile, 'repeater')
+        self.assertNotIn('bssid=', files['radio-config/wpa_supplicant.conf'])
+        self.assertIn('wlan1 wlan1-vxd auto', files['runtime/r15-radio.init'])
+        self.assertEqual(files['radio-config/upstream-ssid'], 'EXAMPLE-TENDA\n')
+
+    def test_control_ssid_encoding_is_literal_for_quotes_controls_and_utf8(self):
+        from r15_repeater import supplicant_text
+        self.assertEqual(supplicant_text(bytes([34, 92, 27, 10, 13, 9, 1, 255])),
+                         r'\"\\\e\n\r\t\x01\xff')
+        self.assertEqual(supplicant_text('café'.encode()), r'caf\xc3\xa9')
+
     def test_same_radio_requires_reviewed_pair_and_unicast_bssid(self):
         base = json.loads((ROOT / 'profile.same-radio.example.json').read_text())
-        for bad in ['', '03:11:22:33:44:55', '00:00:00:00:00:00',
+        for bad in [None, 0, '03:11:22:33:44:55', '00:00:00:00:00:00',
                     '02:11:22:33:44:55;reboot', '02:11:22:33:44:55\n']:
             profile = copy.deepcopy(base)
             profile['upstream']['bssid'] = bad

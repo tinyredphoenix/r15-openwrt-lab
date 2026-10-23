@@ -31,6 +31,27 @@ def check(root, output):
     checks['radio_worker_busybox_syntax'] = 'pass'
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-radio-coordinator'])
     checks['radio_coordinator_busybox_syntax'] = 'pass'
+    subnet_helper = repository / 'prototype/runtime/r15-subnet-check'
+    invoke(root, 'bin/busybox', ['ash', '-n', subnet_helper])
+    # Execute the embedded range arithmetic in target awk, never a host awk
+    # launched by an emulated shell. Synthetic files contain no owner data.
+    subnet_source = subnet_helper.read_text()
+    marker = "LC_ALL=C awk -v learned=\"$1\" '"
+    ending = "' \"$2\"\n"
+    if subnet_source.count(marker) != 1 or not subnet_source.endswith(ending):
+        raise RuntimeError('Unexpected subnet checker wrapper')
+    subnet_awk = subnet_source.split(marker, 1)[1][:-len(ending)]
+    with tempfile.TemporaryDirectory() as subnet_tmp:
+        protected = Path(subnet_tmp) / 'protected'
+        protected.write_text('192.168.77.0/24\n192.168.88.0/24\n')
+        for cidr, expected in [('192.168.0.10/24', 0), ('192.168.77.1/24', 1),
+                               ('192.168.88.254/32', 1), ('192.168.0.1/16', 1),
+                               ('0.0.0.0/0', 1), ('192.168.0.1/33', 2)]:
+            result = invoke(root, 'bin/busybox', ['awk', '-v', 'learned=' + cidr,
+                            subnet_awk, protected], accepted=(0, 1, 2))
+            if result.returncode != expected:
+                raise RuntimeError('Target subnet policy mismatch: ' + cidr)
+    checks['radio_subnet_target_awk'] = 'pass; six synthetic range/rejection cases'
     # Execute the observed failure/recovery sequence in the target ash itself.
     # Every observation/actuator is a shell stub; no host utility, daemon,
     # interface, process stop or network request is dispatched by this fixture.
@@ -56,6 +77,7 @@ align_ap() { echo "align:$1"; }
 rejoin_station() { echo rejoin; }
 request_scan() { echo scan; }
 lease_up() { return 0; }
+lease_network_safe() { return 0; }
 probe_uplink() { echo probe; }
 rlog() { echo unexpected-log; }
 coordinate_tick || exit 1
@@ -136,6 +158,13 @@ echo "ready:$READY"
     if interface.stdout.strip() != '192.0.2.10':
         raise RuntimeError('Radio IPv4 address selector did not return the learned address')
     checks['radio_lease_json'] = 'pass; synthetic input only'
+    lease_fixture = json.dumps({'ipv4-address': [{'address': '192.0.2.10', 'mask': 24}]})
+    prefix = invoke(root, 'usr/bin/jsonfilter', ['-e', '@["ipv4-address"][0].mask'], input=lease_fixture)
+    addresses = invoke(root, 'usr/bin/jsonfilter', ['-e', '@["ipv4-address"][*].address'], input=lease_fixture)
+    if prefix.stdout.strip() != '24' or addresses.stdout.splitlines() != ['192.0.2.10']:
+        raise RuntimeError('Lease prefix/cardinality JSON selection failed')
+    checks['radio_lease_shape_json'] = 'pass; synthetic prefix/address cardinality'
+
     # Keys and temporary config stay outside artifacts and are removed on exit.
     with tempfile.TemporaryDirectory(prefix='r15-userspace-check-') as tmp:
         temporary = Path(tmp)

@@ -23,6 +23,7 @@ align_ap() { echo "ALIGN $1" >> "$CALLS"; [ "$ALIGN_OK" = 1 ]; }
 rejoin_station() { echo REJOIN >> "$CALLS"; [ "$REJOIN_OK" = 1 ]; }
 request_scan() { echo SCAN >> "$CALLS"; }
 lease_up() { [ "$LEASE" = 1 ]; }
+lease_network_safe() { [ "$SUBNET_OK" = 1 ]; }
 probe_uplink() { echo PROBE >> "$CALLS"; [ "$PROBE_OK" = 1 ]; }
 rlog() { echo "LOG $1" >> "$CALLS"; }
 '''
@@ -38,7 +39,7 @@ ROLE=sta; READY=0; ATTACHED=0; FAILURES=0; NEED_REJOIN=0
 REJOIN_WAIT=0; ALIGN_WAIT=0; PENDING_FREQ=
 MGMT=1; TSTATE=COMPLETED; TFREQ=2412; TBSSID=$BSSID; TCARRIER=1
 TAPSTATE=ENABLED; TAFREQ=2412; TSCANFREQ=2412; SCAN_OK=1
-ALIGN_OK=1; REJOIN_OK=1; LEASE=1; PROBE_OK=1
+ALIGN_OK=1; REJOIN_OK=1; LEASE=1; PROBE_OK=1; SUBNET_OK=1
 '''+adapters+'\n'+setup+'\n'+action
             r=subprocess.run(['/bin/sh','-c',script],env=env,capture_output=True,text=True)
             self.assertEqual(r.returncode,0,r.stderr)
@@ -68,7 +69,12 @@ TCARRIER=1; coordinate_tick; echo "$READY"''')
 coordinate_tick; coordinate_tick; echo "$ATTACHED:$READY"
 coordinate_tick; echo "$ATTACHED:$READY"''')
         self.assertEqual(out,['1:0','0:0'])
-        self.assertEqual(calls,['ATTACH','PROBE','PROBE','PROBE','PROBE','DETACH'])
+        self.assertEqual(calls,['ATTACH','PROBE','PROBE','PROBE','PROBE','DETACH','SCAN'])
+
+    def test_failed_data_path_forces_reassociation_even_if_driver_reports_connected(self):
+        calls, out = self.scenario('PROBE_OK=0\ncoordinate_tick; coordinate_tick; coordinate_tick\necho "$NEED_REJOIN:$ATTACHED"\ncoordinate_tick; echo "$NEED_REJOIN:$READY"')
+        self.assertEqual(out, ['1:0', '0:0'])
+        self.assertEqual(calls[-3:], ['DETACH', 'SCAN', 'REJOIN'])
 
     def test_management_loss_does_not_restart_ap_or_management(self):
         calls,out=self.scenario('coordinate_tick; echo "$READY:$ATTACHED"',setup='MGMT=0; ATTACHED=1; READY=1')
@@ -126,6 +132,28 @@ valid_ipv4 '192.0.2.10;reboot'; echo $?
 valid_ipv4 0.0.0.0; echo $?
 valid_ipv4 ''; echo $?""", adapters='')
         self.assertEqual(out, ['0', '1', '1', '1', '1'])
+
+    def test_upstream_reboot_scan_can_move_ap_to_new_channel(self):
+        for ap, sta, old, new in [('wlan1', 'wlan1-vxd', 2412, 2462),
+                                  ('wlan0', 'wlan0-vxd', 5200, 5240)]:
+            with self.subTest(ap=ap):
+                calls, out = self.scenario('coordinate_tick; echo "$READY:$ATTACHED"',
+                    setup=f'AP={ap}; STA={sta}; TSTATE=DISCONNECTED; TAFREQ={old}; TSCANFREQ={new}; ATTACHED=1')
+                self.assertEqual(calls, ['DETACH', f'ALIGN {new}'])
+                self.assertEqual(out, ['0:0'])
+
+    def test_negotiated_channel_change_overrides_old_scan_channel(self):
+        calls, out = self.scenario('coordinate_tick; echo "$READY:$ATTACHED"',
+            setup='TFREQ=2462; TAFREQ=2412; TSCANFREQ=2412; ATTACHED=1')
+        self.assertEqual(calls, ['DETACH', 'ALIGN 2462'])
+        self.assertEqual(out, ['0:0'])
+
+    def test_conflicting_or_invalid_lease_detaches_without_probe(self):
+        calls, out = self.scenario('coordinate_tick; rc=$?; echo "$rc:$READY:$ATTACHED"',
+                                   setup='SUBNET_OK=0')
+        self.assertEqual(out, ['1:0:0'])
+        self.assertEqual(calls[:2], ['ATTACH', 'DETACH'])
+        self.assertFalse(any(x.startswith(('PROBE', 'ALIGN', 'REJOIN')) for x in calls))
 
     def test_shell_syntax(self):
         self.assertEqual(subprocess.run(['/bin/sh','-n',str(COORD)],capture_output=True).returncode,0)

@@ -26,6 +26,10 @@ This implements offline-tested policy for the actual AP-channel/carrier failure 
 
 Review bundles deliberately store scripts as non-executable inputs. They do not enable `/etc/rc.d` entries or write marker files. The future renderer/service packaging must preserve that boundary until board startup, custom AP execution and secure management have been qualified.
 
-`profile.same-radio.example.json` contains example credentials and a synthetic BSSID, never owner data. The selection is pinned and initial channel support is bounded; it does not imply arbitrary roaming or DFS support.
+`profile.same-radio.example.json` contains example credentials and a synthetic BSSID, never owner data. Selection defaults to SSID discovery, with optional BSSID locking, and channel support is bounded; it does not imply arbitrary roaming or DFS support.
 
 Tests run fake shell adapters and never contact the router. Target BusyBox/jsonfilter checks are separately defined in the Linux build; host tests do not execute them.
+
+The same-radio lease guard also requires `/usr/libexec/r15-subnet-check` and the renderer's `radio-config/protected-subnets` at `/etc/r15/protected-subnets`. It rejects connected-subnet overlaps after DHCP; it does not eliminate the route-installation window or inspect classless routes. See the phase-2 update in RADIO-COORDINATION.md.
+
+Automatic mode also requires `radio-config/upstream-ssid` at `/etc/r15/upstream-ssid`. This is a literal encoded SSID line, never sourced or evaluated. Bootstrap AP channels are internal defaults; actual same-radio operation follows fresh scan/negotiated frequency.

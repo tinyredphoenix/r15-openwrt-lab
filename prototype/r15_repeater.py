@@ -60,6 +60,12 @@ def uci(section, kind, values):
     return "\n".join(lines) + "\n\n"
 
 
+def supplicant_text(data):
+    """Match pinned hostap common.c printf_encode, without decoding shell data."""
+    escapes = {34: '\\"', 92: '\\\\', 27: '\\e', 10: '\\n', 13: '\\r', 9: '\\t'}
+    return ''.join(escapes.get(x, chr(x) if 32 <= x <= 126 else '\\x%02x' % x) for x in data)
+
+
 def management_files(profile):
     management = profile["management"]
     address = subnet(management["address"])
@@ -144,10 +150,10 @@ def render(profile, stage):
             expected = ("wlan1", "wlan1-vxd") if upstream["band"] == "2g" else ("wlan0", "wlan0-vxd")
             if (ap, uplink) != expected:
                 raise ValueError("Same-radio mode requires the observed AP/VXD interface pair")
-            if not isinstance(selected_bssid, str) or not re.fullmatch(r"(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}", selected_bssid):
-                raise ValueError("Same-radio mode requires a selected upstream BSSID")
+            if not isinstance(selected_bssid, str) or (selected_bssid and not re.fullmatch(r"(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}", selected_bssid)):
+                raise ValueError("Invalid optional upstream BSSID")
             selected_bssid = selected_bssid.lower()
-            if int(selected_bssid[:2], 16) & 1 or selected_bssid == "00:00:00:00:00:00":
+            if selected_bssid and (int(selected_bssid[:2], 16) & 1 or selected_bssid == "00:00:00:00:00:00"):
                 raise ValueError("Select a nonzero unicast upstream BSSID")
         if len({uplink, ap, *reserved}) != len(reserved) + 2 or any(
             name in ("lo", "br-mgmt", "br-lan") for name in (uplink, ap)
@@ -160,7 +166,7 @@ def render(profile, stage):
             net = ipaddress.IPv4Network(value, strict=False)
             if net.overlaps(management.network) or net.overlaps(lan.network):
                 raise ValueError("Upstream overlaps a local network")
-        channel = downstream["channel"]
+        channel = downstream.get("channel", 1 if downstream["band"] == "2g" else 36)
         choices = (1, 6, 11) if downstream["band"] == "2g" else (36, 40, 44, 48)
         if type(channel) is not int or channel not in choices:
             raise ValueError("Use a conservative fixed 20 MHz prototype AP channel")
@@ -169,7 +175,8 @@ def render(profile, stage):
             "ctrl_interface=/var/run/r15-wpa\ncountry=IN\nap_scan=1\nnetwork={\n"
             "\tssid=%s\n\tscan_ssid=1\n\tproto=RSN\n\tkey_mgmt=WPA-PSK\n"
             "\tpairwise=CCMP\n\tgroup=CCMP\n\tpsk=%s\n}\n" % (ssid(upstream["ssid"]).hex(), sta_key))
-        if same_radio:
+        files["radio-config/upstream-ssid"] = supplicant_text(ssid(upstream["ssid"])) + "\n"
+        if same_radio and selected_bssid:
             files["radio-config/wpa_supplicant.conf"] = files["radio-config/wpa_supplicant.conf"].replace(
                 "network={\n", "network={\n\tbssid=" + selected_bssid + "\n", 1)
         files["radio-config/hostapd.conf"] = (
@@ -178,6 +185,9 @@ def render(profile, stage):
             "ieee80211n=1\nwmm_enabled=1\nauth_algs=1\nwpa=2\n"
             "wpa_key_mgmt=WPA-PSK\nrsn_pairwise=CCMP\nwpa_psk=%s\n" % (
                 ap, ssid(downstream["ssid"]).hex(), "g" if downstream["band"] == "2g" else "a", channel, ap_key))
+        files["radio-config/protected-subnets"] = str(management.network) + "\n" + str(lan.network) + "\n"
+        files["runtime/r15-subnet-check"] = (
+            Path(__file__).parent / "runtime/r15-subnet-check").read_text()
         files["runtime/r15-radio-worker"] = (
             Path(__file__).parent / "runtime/r15-radio-worker").read_text()
         files["runtime/r15-radio.init"] = (
@@ -202,7 +212,7 @@ def render(profile, stage):
                 "    procd_set_param command /usr/libexec/r15-radio-coordinator %s %s %s\n"
                 "    procd_set_param respawn 3600 5 5\n"
                 "    procd_set_param stdout 1\n    procd_set_param stderr 1\n"
-                "    procd_close_instance\n}\n" % (ap, uplink, selected_bssid))
+                "    procd_close_instance\n}\n" % (ap, uplink, selected_bssid or "auto"))
         # No static ifname: vendor Wi-Fi must be attached as an external device
         # by a future board-specific backend, rather than recreated by netifd.
         files["openwrt-config/network"] += uci("lan", "interface", [("type", "bridge"),
@@ -227,7 +237,7 @@ def render(profile, stage):
                     "Custom hostapd AP startup on the R15 not qualified; prior runtime AP tests retained OEM hostapd",
                     "Radio worker and external-device reconnect implemented; target execution and procd integration untested",
                     "Board driver/MAC/RF initialization and board-startup-verified prerequisite not implemented",
-                    "Runtime upstream-subnet conflict check not implemented"]
+                    "Learned connected-subnet rejection implemented for same-radio coordinator; DHCP route window and classless routes remain unprotected; cross-radio worker lacks this guard"]
         if same_radio:
             pending += ["Same-radio coordinator has offline tests only; target execution and custom AP startup are unqualified",
                         "Selected-BSSID policy does not implement roaming or DFS/high-band channel coordination",

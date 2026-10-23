@@ -33,6 +33,48 @@ scan_frequency() {
     [ "$AGE" -le 30 ] || return 1
     frequency_channel "$SCANFREQ" >/dev/null
 }
+station_matches() {
+    if [ "${AUTO_BSS:-0}" = 1 ]; then
+        [ "$(printf '%s\n' "$STATION" | field ssid)" = "$SSID_TEXT" ] &&
+        [ "$(printf '%s\n' "$STATION" | field id)" = 0 ] &&
+        [ "$(printf '%s\n' "$STATION" | field key_mgmt)" = WPA2-PSK ] &&
+        [ "$(printf '%s\n' "$STATION" | field pairwise_cipher)" = CCMP ] &&
+        [ "$(printf '%s\n' "$STATION" | field group_cipher)" = CCMP ] || return 1
+        valid_bssid "$SBSSID" || return 1
+        BSSID=$SBSSID
+    else
+        [ "$SBSSID" = "$BSSID" ]
+    fi
+}
+auto_scan_frequency() {
+    results=$(wcli scan_results 2>/dev/null) || return 1
+    # SSID is matched as supplicant printf_encode text, passed through the
+    # environment rather than interpreted as awk escapes or shell code.
+    candidates=$(printf '%s\n' "$results" | R15_SSID_TEXT="$SSID_TEXT" awk -F '\t' '
+        NF==5 && $5==ENVIRON["R15_SSID_TEXT"] &&
+        $4 ~ /\[WPA2-PSK-CCMP\]/ && $4 ~ /\[ESS\]/ &&
+        $3 ~ /^-?[0-9]+$/ { print $3, $1 }
+    ' | sort -nr | head -n 16 | awk '{print $2}')
+    for candidate in $candidates; do
+        valid_bssid "$candidate" || continue
+        BSS=$(wcli bss "$candidate" 2>/dev/null) || continue
+        [ "$(printf '%s\n' "$BSS" | field ssid)" = "$SSID_TEXT" ] || continue
+        flags=$(printf '%s\n' "$BSS" | field flags)
+        case "$flags" in *'[WPA2-PSK-CCMP]'*'[ESS]'*) ;; *) continue ;; esac
+        BSSID=$candidate
+        if scan_frequency; then return 0; fi
+    done
+    return 1
+}
+select_scan_frequency() {
+    if [ "${AUTO_BSS:-0}" = 1 ]; then auto_scan_frequency; else scan_frequency; fi
+}
+valid_bssid() {
+    printf '%s\n' "$1" | grep -Eq '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' || return 1
+    case "$1" in 00:00:00:00:00:00|ff:ff:ff:ff:ff:ff) return 1 ;; esac
+    first=${1%%:*}
+    [ $((0x$first & 1)) -eq 0 ]
+}
 frequency_channel() {
     # Initial conservative non-DFS scope; hostapd/driver still enforce IN rules.
     case "$AP:$1" in
@@ -49,10 +91,7 @@ frequency_channel() {
 }
 valid_same_pair() {
     case "$AP:$STA" in wlan1:wlan1-vxd|wlan0:wlan0-vxd) ;; *) return 1 ;; esac
-    printf '%s\n' "$BSSID" | grep -Eq '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' || return 1
-    case "$BSSID" in 00:00:00:00:00:00|ff:ff:ff:ff:ff:ff) return 1 ;; esac
-    FIRST=${BSSID%%:*}
-    [ $((0x$FIRST & 1)) -eq 0 ]
+    [ "${AUTO_BSS:-0}" = 1 ] || valid_bssid "$BSSID"
 }
 stop_owned() {
     [ -n "$1" ] || return 0
@@ -100,6 +139,14 @@ lease_up() {
     lease=$(printf '%s\n' "$WWAN" | jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null)
     valid_ipv4 "$lease"
 }
+lease_network_safe() {
+    # Validate the learned connected subnet before readiness/probing. DHCP may
+    # already have installed routes: this is rejection, not an atomic route gate.
+    prefix=$(printf '%s\n' "$WWAN" | jsonfilter -e '@["ipv4-address"][0].mask' 2>/dev/null)
+    count=$(printf '%s\n' "$WWAN" | jsonfilter -e '@["ipv4-address"][*].address' 2>/dev/null | wc -l)
+    [ "$count" -eq 1 ] || return 1
+    /usr/libexec/r15-subnet-check "$lease/$prefix" /etc/r15/protected-subnets || return 1
+}
 valid_ipv4() {
     case "$1" in 0.0.0.0|255.255.255.255) return 1 ;; esac
     printf '%s\n' "$1" | awk -F. '
@@ -131,9 +178,9 @@ coordinate_tick() {
     management_up || { link_down; return 0; }
     read_station
     read_ap
-    if [ "$STATE" = COMPLETED ] && [ "$SBSSID" = "$BSSID" ] && [ "$CARRIER" = 1 ]; then
+    if [ "$STATE" = COMPLETED ] && [ "$CARRIER" = 1 ] && station_matches; then
         target=$SFREQ
-    elif scan_frequency; then
+    elif select_scan_frequency; then
         target=$SCANFREQ
     else
         link_down
@@ -174,7 +221,7 @@ coordinate_tick() {
         fi
         return 0
     fi
-    if [ "$STATE" != COMPLETED ] || [ "$SBSSID" != "$BSSID" ] || [ "$CARRIER" != 1 ]; then
+    if [ "$STATE" != COMPLETED ] || [ "$CARRIER" != 1 ] || ! station_matches; then
         link_down
         request_scan
         return 0
@@ -184,11 +231,20 @@ coordinate_tick() {
     # ifup is asynchronous. Do not call it a ready link before DHCP/data checks.
     READY=0
     if lease_up; then
+        if ! lease_network_safe; then
+            link_down
+            rlog 'Uplink subnet is conflicting or cannot be validated; controller stopping'
+            return 1
+        fi
         if probe_uplink; then
             FAILURES=0; READY=1
         else
             FAILURES=$((FAILURES + 1))
-            [ "$FAILURES" -lt 3 ] || link_down
+            if [ "$FAILURES" -ge 3 ]; then
+                link_down
+                NEED_REJOIN=1
+                request_scan
+            fi
         fi
     fi
 }
@@ -201,6 +257,12 @@ coordinator_cleanup() {
 }
 coordinator_main() {
     AP=$1; STA=$2; BSSID=$(printf '%s' "$3" | tr A-F a-f)
+    AUTO_BSS=0; SSID_TEXT=
+    if [ "$BSSID" = auto ]; then AUTO_BSS=1; BSSID=; fi
+    # Single canonical text line generated from SSID bytes, never sourced.
+    [ -r /etc/r15/upstream-ssid ] || return 1
+    IFS= read -r SSID_TEXT < /etc/r15/upstream-ssid || return 1
+    [ -n "$SSID_TEXT" ] || return 1
     ROLE=sta; ATTACHED=0; READY=0; FAILURES=0
     NEED_REJOIN=0; REJOIN_WAIT=0; ALIGN_WAIT=0; PENDING_FREQ=; APCHILD=; STACHILD=
     valid_same_pair || { rlog 'Unsupported same-radio configuration'; return 2; }

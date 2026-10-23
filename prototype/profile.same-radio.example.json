@@ -13,16 +13,14 @@
     "band": "2g",
     "interface": "wlan1-vxd",
     "ssid": "EXAMPLE-TENDA",
-    "key": "EXAMPLE-ONLY-change-before-use",
-    "bssid": "02:11:22:33:44:55"
+    "key": "EXAMPLE-ONLY-change-before-use"
   },
   "downstream": {
     "band": "2g",
     "interface": "wlan1",
     "address": "192.168.78.1/24",
     "ssid": "EXAMPLE-R15",
-    "key": "EXAMPLE-ONLY-change-before-use",
-    "channel": 1
+    "key": "EXAMPLE-ONLY-change-before-use"
   },
-  "evidence": "Review-only same-radio profile. BSSID and credentials are examples. Paired coordinator is offline-tested only; custom boot and AP startup remain unqualified."
+  "evidence": "Review-only automatic SSID discovery profile. Credentials are examples. Coordinator is offline-tested only; custom boot, regulatory coverage and AP startup remain unqualified."
 }
