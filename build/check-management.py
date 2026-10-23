@@ -31,6 +31,50 @@ def check(root, output):
     checks['radio_worker_busybox_syntax'] = 'pass'
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-radio-coordinator'])
     checks['radio_coordinator_busybox_syntax'] = 'pass'
+    # Execute the observed failure/recovery sequence in the target ash itself.
+    # Every observation/actuator is a shell stub; no host utility, daemon,
+    # interface, process stop or network request is dispatched by this fixture.
+    policy_fixture = r'''
+R15_SOURCE_ONLY=1
+R15_WORKER_LIBRARY=$1
+. "$2"
+AP=wlan1; STA=wlan1-vxd; BSSID=02:11:22:33:44:55
+ROLE=sta; ATTACHED=1; READY=0; FAILURES=0; NEED_REJOIN=0
+REJOIN_WAIT=0; ALIGN_WAIT=0; PENDING_FREQ=
+TFREQ=2452; TCARRIER=1
+management_up() { return 0; }
+read_station() { STATE=COMPLETED; SFREQ=2412; SBSSID=$BSSID; CARRIER=$TCARRIER; }
+read_ap() { APSTATE=ENABLED; AFREQ=$TFREQ; }
+scan_frequency() { SCANFREQ=2412; return 0; }
+handle_link() {
+ case "$1:$ATTACHED" in
+  disconnected:1) echo detach; ATTACHED=0 ;;
+  connected:0) echo attach; ATTACHED=1 ;;
+ esac
+}
+align_ap() { echo "align:$1"; }
+rejoin_station() { echo rejoin; }
+request_scan() { echo scan; }
+lease_up() { return 0; }
+probe_uplink() { echo probe; }
+rlog() { echo unexpected-log; }
+coordinate_tick || exit 1
+echo "ready:$READY"
+TFREQ=2412; TCARRIER=0
+coordinate_tick || exit 1
+echo "ready:$READY"
+TCARRIER=1
+coordinate_tick || exit 1
+echo "ready:$READY"
+'''
+    policy = invoke(root, 'bin/busybox', ['ash', '-s', '--',
+        repository / 'prototype/runtime/r15-radio-worker',
+        repository / 'prototype/runtime/r15-radio-coordinator'], input=policy_fixture)
+    expected = ['detach', 'align:2412', 'ready:0', 'rejoin', 'ready:0',
+                'attach', 'probe', 'ready:1']
+    if policy.stdout.splitlines() != expected:
+        raise RuntimeError('Target radio policy failure/recovery sequence failed: ' + policy.stdout)
+    checks['radio_coordinator_target_policy'] = 'pass; target ash with shell-only fake adapters'
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-health'])
     checks['health_probe_busybox_syntax'] = 'pass'
     helpers = json.loads((repository / 'build/common-runtime-manifest.json').read_text())
