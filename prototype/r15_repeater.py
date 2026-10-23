@@ -220,6 +220,17 @@ def render(profile, stage):
         if same_radio:
             files["runtime/r15-radio-coordinator"] = (
                 Path(__file__).parent / "runtime/r15-radio-coordinator").read_text()
+            files["runtime/r15-radio-config.lua"] = (
+                Path(__file__).parent / "runtime/r15-radio-config.lua").read_text()
+            # Store derived PSKs rather than duplicating plaintext passphrases.
+            # This schema is consumed by our adapter, never the mac80211 backend.
+            radio_options = [("enabled", "1"), ("country", "IN"),
+                ("encryption", "psk2+ccmp"), ("band", upstream["band"]),
+                ("upstream_ssid_hex", ssid(upstream["ssid"]).hex()), ("upstream_key", sta_key),
+                ("ap_ssid_hex", ssid(downstream["ssid"]).hex()), ("ap_key", ap_key)]
+            if selected_bssid:
+                radio_options.append(("bssid", selected_bssid))
+            files["openwrt-config/r15_radio"] = uci("repeater", "repeater", radio_options)
             files["runtime/r15-radio.init"] = (
                 "#!/bin/sh /etc/rc.common\nUSE_PROCD=1\nSTART=80\nSTOP=10\n"
                 "start_service() {\n    procd_open_instance paired\n"
@@ -254,7 +265,8 @@ def render(profile, stage):
                     "Learned connected-subnet rejection implemented for same-radio coordinator; DHCP route window and classless routes remain unprotected; cross-radio worker lacks this guard"]
         if same_radio:
             pending += ["Same-radio coordinator has offline tests only; target execution and custom AP startup are unqualified",
-                        "Selected-BSSID policy does not implement roaming or DFS/high-band channel coordination",
+                        "SSID discovery and optional BSSID pinning implemented; roaming and DFS/high-band coordination unqualified",
+                        "Dedicated radio UCI reader implemented; service apply and LuCI form are not yet integrated",
                         "Gateway ICMP health policy requires validation; no Internet or production readiness is inferred"]
     laptop = management.network.network_address + (2 if (int(management.ip) & 255) != 2 else 3)
     files["REVIEW-ONLY.txt"] = (

@@ -70,4 +70,33 @@ function M.render(config)
     return {ap=ap,sta=sta,bssid=pin or 'auto',supplicant=supplicant,hostapd=hostapd,
             upstream_text=M.control_ssid(upstream)..'\n'}
 end
+-- Dedicated UCI schema: standard mac80211 interface creation is unsafe for
+-- these vendor AP/VXD devices. Reading settings never commits or applies them.
+function M.from_uci(cursor)
+    assert(type(cursor)=='table' or type(cursor)=='userdata', 'UCI cursor required')
+    local selected, count=nil,0
+    cursor:foreach('r15_radio','repeater',function(section)
+        count=count+1
+        assert(section['.name']=='repeater', 'Use the named repeater section')
+        selected=section
+    end)
+    assert(count==1, 'Exactly one repeater section required')
+    assert(selected.enabled=='0' or selected.enabled=='1', 'Explicit enabled flag required')
+    if selected.enabled=='0' then return nil end
+    assert(selected.country=='IN', 'Only the India board profile is supported')
+    assert(selected.encryption=='psk2+ccmp', 'Only WPA2-PSK/CCMP is supported')
+    local allowed={enabled=true,country=true,encryption=true,band=true,
+        upstream_ssid_hex=true,upstream_key=true,ap_ssid_hex=true,ap_key=true,bssid=true}
+    for key in pairs(selected) do
+        assert(key:sub(1,1)=='.' or allowed[key], 'Unsupported repeater option')
+    end
+    local function decode(value)
+        assert(type(value)=='string' and #value>=2 and #value<=64 and #value%2==0
+            and not value:find('[^%x]'), 'SSID must be 1-32 hex-encoded bytes')
+        return (value:gsub('..',function(byte) return string.char(tonumber(byte,16)) end))
+    end
+    return M.render({band=selected.band,bssid=selected.bssid,
+        upstream_ssid=decode(selected.upstream_ssid_hex),upstream_key=selected.upstream_key,
+        ap_ssid=decode(selected.ap_ssid_hex),ap_key=selected.ap_key})
+end
 return M

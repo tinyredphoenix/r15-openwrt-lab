@@ -135,6 +135,19 @@ class RepeaterTests(unittest.TestCase):
         self.assertIn('wlan1 wlan1-vxd auto', files['runtime/r15-radio.init'])
         self.assertEqual(files['radio-config/upstream-ssid'], 'EXAMPLE-TENDA\n')
 
+    def test_radio_uci_stores_derived_keys_and_byte_encoded_names(self):
+        profile = json.loads((ROOT / 'profile.same-radio.example.json').read_text())
+        profile['upstream']['ssid'] = "Naman's \u00e9\nrouter"
+        profile['downstream']['ssid'] = 'quote"\\name'
+        files, _ = render(profile, 'repeater')
+        config = files['openwrt-config/r15_radio']
+        self.assertIn(profile['upstream']['ssid'].encode().hex(), config)
+        self.assertIn(profile['downstream']['ssid'].encode().hex(), config)
+        self.assertNotIn(profile['upstream']['key'], config)
+        self.assertIn(psk(profile['upstream']['ssid'], profile['upstream']['key']), config)
+        self.assertNotIn('option channel', config)
+        self.assertIn('runtime/r15-radio-config.lua', files)
+
     def test_control_ssid_encoding_is_literal_for_quotes_controls_and_utf8(self):
         from r15_repeater import supplicant_text
         self.assertEqual(supplicant_text(bytes([34, 92, 27, 10, 13, 9, 1, 255])),

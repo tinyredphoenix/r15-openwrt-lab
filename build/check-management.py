@@ -193,6 +193,24 @@ echo "ready:$READY"
             if 'package ' + name not in result.stdout:
                 raise RuntimeError('UCI failed to export ' + name)
         checks['renderer_uci_parsing'] = ['network', 'dhcp', 'dropbear', 'firewall', 'uhttpd', 'rpcd']
+        same = json.loads((repository / 'prototype/profile.same-radio.example.json').read_text())
+        same['upstream']['ssid'] = "owner's \u00e9\nSSID"
+        same_files, _ = renderer.render(same, 'repeater')
+        (config / 'r15_radio').write_text(same_files['openwrt-config/r15_radio'])
+        invoke(root, 'sbin/uci', ['-c', config, '-P', state, 'export', 'r15_radio'])
+        radio_uci = invoke(root, 'usr/bin/lua', ['-', root, config, state,
+            root / 'usr/libexec/r15-radio-config.lua'], input=r"""
+package.cpath=arg[1]..'/usr/lib/lua/?.so;'..arg[1]..'/usr/lib/lua/?/init.so'
+local cursor=require('uci').cursor(arg[2],arg[3])
+local radio=assert(loadfile(arg[4]))()
+local profile=radio.from_uci(cursor)
+assert(profile.ap=='wlan1' and profile.sta=='wlan1-vxd' and profile.bssid=='auto')
+assert(profile.supplicant:find('ssid=6f776e6572277320c3a90a53534944',1,true))
+print('radio-uci-pass')
+""")
+        if radio_uci.stdout.strip() != 'radio-uci-pass':
+            raise RuntimeError('Target UCI radio profile round-trip failed')
+        checks['radio_uci_target_roundtrip'] = 'pass; actual UCI parser, quote/newline/UTF-8 SSID, no commit or service apply'
         dns_config = temporary / 'dnsmasq.conf'
         dns_config.write_text('port=0\ninterface=br-mgmt\nbind-dynamic\n'
                               'dhcp-range=192.168.77.100,192.168.77.149,255.255.255.0,1h\n'
@@ -228,6 +246,23 @@ assert(not pcall(radio.render,{band='bad'}))
 assert(not pcall(radio.psk,'IEEE','short'))
 assert(not pcall(radio.render,{band='2g',upstream_ssid='a',upstream_key=string.rep('a',64),
     ap_ssid='b',ap_key=string.rep('b',64),bssid='03:11:22:33:44:55'}))
+local section={['.name']='repeater',['.type']='repeater',enabled='1',country='IN',
+    encryption='psk2+ccmp',band='5g',upstream_ssid_hex='49276d0a',
+    upstream_key=string.rep('a',64),ap_ssid_hex='6170',ap_key=string.rep('b',64)}
+local fake={foreach=function(self,package,kind,callback)
+    assert(package=='r15_radio' and kind=='repeater'); callback(section)
+end}
+local uci_render=radio.from_uci(fake)
+assert(uci_render.ap=='wlan0' and uci_render.sta=='wlan0-vxd')
+assert(uci_render.upstream_text=="I'm"..string.char(92)..'n'..string.char(10))
+section.enabled='0'; assert(radio.from_uci(fake)==nil)
+section.enabled='1'; section.channel='36'; assert(not pcall(radio.from_uci,fake)); section.channel=nil
+section.country='US'; assert(not pcall(radio.from_uci,fake)); section.country='IN'
+section.encryption='none'; assert(not pcall(radio.from_uci,fake)); section.encryption='psk2+ccmp'
+section.upstream_ssid_hex='abc'; assert(not pcall(radio.from_uci,fake))
+section.upstream_ssid_hex='gg'; assert(not pcall(radio.from_uci,fake))
+assert(not pcall(radio.from_uci,{foreach=function() end}))
+assert(not pcall(radio.from_uci,{foreach=function(self,p,k,cb) cb(section);cb(section) end}))
 print('radio-config-pass')
 """)
     if radio_lua.stdout.strip() != 'radio-config-pass':
