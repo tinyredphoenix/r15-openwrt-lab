@@ -31,6 +31,18 @@ def check(root, output):
     checks['radio_worker_busybox_syntax'] = 'pass'
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-health'])
     checks['health_probe_busybox_syntax'] = 'pass'
+    # Source-verified -h exits before fw3 builds state, connects to ubus or
+    # touches netfilter. Never call start/stop/flush/print under user emulation.
+    firewall = invoke(root, 'sbin/fw3', ['-h'], accepted=(1,))
+    if 'fw3 [-4]' not in firewall.stderr:
+        raise RuntimeError('Missing firewall3 help output')
+    checks['firewall_help'] = 'pass; help-only, no firewall state accessed'
+    for program in ('iptables', 'ip6tables'):
+        version = invoke(root, 'usr/sbin/' + program, ['--version'])
+        if not re.search(r'^' + program + r' v[0-9].*\(legacy\)', version.stdout):
+            raise RuntimeError('Expected legacy xtables version: ' + program)
+        checks[program + '_version'] = version.stdout.strip()
+    checks['firewall_rules_enforced'] = False
     dropbear = invoke(root, 'usr/sbin/dropbear', ['-V'], accepted=(0, 1))
     if 'Dropbear v' not in dropbear.stdout + dropbear.stderr:
         raise RuntimeError('Missing Dropbear version output')

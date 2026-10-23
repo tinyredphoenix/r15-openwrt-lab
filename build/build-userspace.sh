@@ -43,7 +43,8 @@ for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
     CONFIG_DRIVER_11N_SUPPORT=y CONFIG_DRIVER_11AC_SUPPORT=y \
     CONFIG_PACKAGE_busybox=y CONFIG_PACKAGE_procd=y CONFIG_PACKAGE_netifd=y \
     CONFIG_PACKAGE_uci=y CONFIG_PACKAGE_dropbear=y CONFIG_PACKAGE_dnsmasq=y \
-    CONFIG_PACKAGE_jsonfilter=y CONFIG_DROPBEAR_ED25519=y; do
+    CONFIG_PACKAGE_jsonfilter=y CONFIG_DROPBEAR_ED25519=y \
+    CONFIG_PACKAGE_firewall=y CONFIG_PACKAGE_iptables=y CONFIG_PACKAGE_ip6tables=y; do
     grep -qx "$symbol" "$SDK/.config" || { echo "Missing build setting: $symbol" >&2; exit 1; }
 done
 # Invalidate wpad only when the added patch changes. OpenWrt tracks configuration
@@ -55,7 +56,7 @@ make -C "$SDK" package/toolchain/compile -j2 V=s
 make -C "$SDK" package/network/services/hostapd/compile -j2 V=s
 for package in utils/busybox system/procd system/ubox system/ubus system/uci \
     network/config/netifd network/services/dropbear network/services/dnsmasq \
-    utils/jsonfilter; do
+    utils/jsonfilter network/utils/iptables network/config/firewall; do
     make -C "$SDK" "package/$package/compile" -j2 V=s
 done
 python3 "$ROOT/build/collect-userspace.py" "$SDK" "$ROOT/artifacts"

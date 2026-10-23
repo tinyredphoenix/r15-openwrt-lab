@@ -22,6 +22,18 @@ class CollectorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Missing runtime dependency'):
             m.dependency_closure({'wpad': {'Depends': 'missing-lib'}}, ['wpad'])
 
+    def test_kernel_requirements_are_recorded_and_never_collected_as_sdk_modules(self):
+        packages = {'firewall': {'Depends': 'libc, kmod-ipt-core, kernel (= 1)'},
+                    'libc': {}, 'kmod-ipt-core': {}, 'kernel': {}}
+        external = set()
+        self.assertEqual(m.dependency_closure(packages, ['firewall'], external), {'firewall', 'libc'})
+        self.assertEqual(external, {'kmod-ipt-core', 'kernel'})
+
+    def test_kernel_exclusion_does_not_hide_missing_userspace_library(self):
+        with self.assertRaisesRegex(ValueError, 'Missing runtime dependency'):
+            m.dependency_closure({'firewall': {'Depends': 'missing-lib, kmod-ipt-core'}},
+                                 ['firewall'], set())
+
     def test_foreign_or_truncated_elf_rejected(self):
         data = bytearray(52)
         data[:6] = b'\x7fELF\x01\x02'

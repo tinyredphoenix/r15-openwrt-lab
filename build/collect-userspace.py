@@ -13,7 +13,7 @@ import tarfile
 
 ROOT_PACKAGES = ['wpad-basic', 'wpa-cli', 'hostapd-utils', 'busybox', 'procd',
                  'ubox', 'logd', 'ubus', 'ubusd', 'uci', 'netifd', 'dropbear',
-                 'dnsmasq', 'jsonfilter']
+                 'dnsmasq', 'jsonfilter', 'firewall', 'iptables', 'ip6tables']
 
 def safe_path(root, name):
     path = PurePosixPath(name)
@@ -70,7 +70,7 @@ def ipk_metadata(path):
         return dict(Parser().parsestr(inner.extractfile(member).read().decode()).items())
 
 
-def dependency_closure(metadata, roots):
+def dependency_closure(metadata, roots, external_kernel=None):
     providers = {name: name for name in metadata}
     for name, fields in metadata.items():
         for alias in fields.get('Provides', '').split(','):
@@ -82,6 +82,11 @@ def dependency_closure(metadata, roots):
     while pending:
         requested = pending.pop()
         alternatives = [re.sub(r'\s*\([^)]*\)', '', p).strip() for p in requested.split('|')]
+        if external_kernel is not None and all(x == 'kernel' or x.startswith('kmod-') for x in alternatives):
+            # Record, never satisfy, board-kernel requirements. SDK modules
+            # target unrelated switch hardware and must not enter this tree.
+            external_kernel.update(alternatives)
+            continue
         name = next((providers[x] for x in alternatives if x in providers), None)
         if name is None:
             raise ValueError('Missing runtime dependency: ' + requested)
@@ -126,7 +131,8 @@ def collect(sdk, output):
             raise ValueError('Multiple versions of package: ' + name)
         available[name] = package
         metadata[name] = fields
-    selected = dependency_closure(metadata, ROOT_PACKAGES)
+    external_kernel = set()
+    selected = dependency_closure(metadata, ROOT_PACKAGES, external_kernel)
     for name in sorted(selected):
         package = available[name]
         digest = seen[package.name]
@@ -167,6 +173,8 @@ def collect(sdk, output):
               'soc_compatibility': 'ISA candidate for RTL8198D; driver/runtime compatibility unverified',
               'association_patch_marker_present': True, 'packages': records, 'elf_files': elf}
     result['root_packages'] = ROOT_PACKAGES
+    result['unverified_kernel_package_dependencies'] = sorted(external_kernel)
+    result['kernel_package_dependencies_satisfied'] = False
     result['boot_framework_complete'] = False
     result['excluded_board_files'] = 'SDK base-files is intentionally excluded: it targets RTL838x switches, not R15'
     result['regular_file_bytes'] = sum(p.stat().st_size for p in root.rglob('*')
