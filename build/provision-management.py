@@ -12,7 +12,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 def openssl(arguments):
     result = subprocess.run(['openssl', *map(str, arguments)], text=True,
-                            capture_output=True, timeout=20)
+                            capture_output=True, timeout=20, env=dict(os.environ, LC_ALL='C'))
     if result.returncode:
         raise ValueError('Management TLS identity validation failed')
     return result.stdout
@@ -38,7 +38,10 @@ def provision(root, profile_path, secrets_dir, report_path):
     if key_pub != cert_pub:
         raise ValueError('TLS certificate/private key mismatch')
     address=str(ipaddress.ip_interface(profile['management']['address']).ip)
-    openssl(['x509','-in',cert,'-noout','-checkip',address])
+    match=openssl(['x509','-in',cert,'-noout','-checkip',address])
+    # Some OpenSSL versions return zero even for a negative checkip result.
+    if match.strip() != 'IP ' + address + ' does match certificate':
+        raise ValueError('TLS certificate does not match management address')
     openssl(['x509','-in',cert,'-noout','-checkend','86400'])
     # Check every target path before opening account/config files or writing.
     names=['etc/passwd','etc/shadow','etc/uhttpd.crt','etc/uhttpd.key',
