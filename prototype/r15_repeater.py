@@ -231,13 +231,8 @@ def render(profile, stage):
             if selected_bssid:
                 radio_options.append(("bssid", selected_bssid))
             files["openwrt-config/r15_radio"] = uci("repeater", "repeater", radio_options)
-            files["runtime/r15-radio.init"] = (
-                "#!/bin/sh /etc/rc.common\nUSE_PROCD=1\nSTART=80\nSTOP=10\n"
-                "start_service() {\n    procd_open_instance paired\n"
-                "    procd_set_param command /usr/libexec/r15-radio-coordinator %s %s %s\n"
-                "    procd_set_param respawn 3600 5 5\n"
-                "    procd_set_param stdout 1\n    procd_set_param stderr 1\n"
-                "    procd_close_instance\n}\n" % (ap, uplink, selected_bssid or "auto"))
+            for helper in ("r15-radio-launch", "r15-radio.init"):
+                files["runtime/" + helper] = (Path(__file__).parent / "runtime" / helper).read_text()
         # No static ifname: vendor Wi-Fi must be attached as an external device
         # by a future board-specific backend, rather than recreated by netifd.
         files["openwrt-config/network"] += uci("lan", "interface", [("type", "bridge"),
@@ -266,7 +261,7 @@ def render(profile, stage):
         if same_radio:
             pending += ["Same-radio coordinator has offline tests only; target execution and custom AP startup are unqualified",
                         "SSID discovery and optional BSSID pinning implemented; roaming and DFS/high-band coordination unqualified",
-                        "Dedicated radio UCI reader implemented; service apply and LuCI form are not yet integrated",
+                        "Dedicated radio UCI reader and supervised reload entry implemented; actual apply and LuCI form remain unqualified",
                         "Gateway ICMP health policy requires validation; no Internet or production readiness is inferred"]
     laptop = management.network.network_address + (2 if (int(management.ip) & 255) != 2 else 3)
     files["REVIEW-ONLY.txt"] = (

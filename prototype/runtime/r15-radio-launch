@@ -1,0 +1,39 @@
+#!/bin/sh
+# procd entry: snapshot validated UCI settings privately, then own one controller.
+# Wired management, board initialization and persistent storage are untouched.
+umask 077
+WORK=$(mktemp -d /var/run/r15-uci.XXXXXX) || exit 1
+CHILD=
+cleanup() { rm -rf "$WORK"; }
+stop_child() {
+    [ -z "$CHILD" ] || kill -TERM "$CHILD" 2>/dev/null
+    [ -z "$CHILD" ] || wait "$CHILD" 2>/dev/null
+    CHILD=
+}
+trap cleanup EXIT
+trap 'stop_child; exit 0' INT TERM
+lua - "$WORK" <<'LUA'
+local radio=assert(loadfile('/usr/libexec/r15-radio-config.lua'))()
+local profile=radio.from_uci(require('uci').cursor())
+if not profile then os.exit(3) end
+local directory=assert(arg[1])
+local function write(name,value)
+    local file=assert(io.open(directory..'/'..name,'w'))
+    assert(file:write(value)); assert(file:close())
+end
+write('hostapd.conf',profile.hostapd)
+write('wpa_supplicant.conf',profile.supplicant)
+write('upstream-ssid',profile.upstream_text)
+write('selection',profile.ap..' '..profile.sta..' '..profile.bssid..'\n')
+LUA
+status=$?
+[ "$status" != 3 ] || exit 0
+[ "$status" = 0 ] || { logger -t r15-radio 'Invalid radio UCI configuration; controller not started'; exit 1; }
+IFS=' ' read -r AP STA BSSID < "$WORK/selection" || exit 1
+case "$AP:$STA" in wlan1:wlan1-vxd|wlan0:wlan0-vxd) ;; *) exit 1 ;; esac
+/usr/libexec/r15-radio-coordinator "$AP" "$STA" "$BSSID" "$WORK" &
+CHILD=$!
+wait "$CHILD"
+status=$?
+CHILD=
+exit "$status"

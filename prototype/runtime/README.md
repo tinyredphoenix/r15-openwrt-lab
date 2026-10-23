@@ -35,3 +35,13 @@ The same-radio lease guard also requires `/usr/libexec/r15-subnet-check` and the
 Automatic mode also requires `radio-config/upstream-ssid` at `/etc/r15/upstream-ssid`. This is a literal encoded SSID line, never sourced or evaluated. Bootstrap AP channels are internal defaults; actual same-radio operation follows fresh scan/negotiated frequency.
 
 The pre-publication DHCP wrapper and `r15-dhcp-guard` are staged by `build/stage-dhcp-guard.py`, preserving the exact pinned original DHCP script. They run no services during build staging. Missing policy rejects a WWAN lease; the correct private policy must be provisioned by future packaging. Host tests cover valid/invalid bound and renew dispatch; target runtime integration remains untested.
+
+### UCI service entry
+
+Same-radio procd startup/reload uses `r15-radio-launch`. It renders one validated
+UCI snapshot in a private RAM directory, starts one owned controller and removes
+the snapshot after exit. An invalid/disabled profile starts no radio controller.
+The controller still requires the independently established board-startup marker,
+existing interfaces and wired management; the launcher cannot create that marker.
+It neither adopts nor kills stock services. The actual integrated device run is
+pending. Cross-radio profiles retain their earlier direct worker template.

@@ -119,7 +119,9 @@ class RepeaterTests(unittest.TestCase):
                 files, manifest = render(profile, 'repeater')
                 init = files['runtime/r15-radio.init']
                 self.assertEqual(init.count('procd_open_instance'), 1)
-                self.assertIn('r15-radio-coordinator ' + ap + ' ' + sta, init)
+                self.assertIn('r15-radio-launch', init)
+                self.assertIn('procd_add_reload_trigger r15_radio', init)
+                self.assertIn('runtime/r15-radio-launch', files)
                 self.assertNotIn('r15-radio-worker ap', init)
                 self.assertIn('bssid=02:11:22:33:44:55', files['radio-config/wpa_supplicant.conf'])
                 self.assertIn('runtime/r15-radio-coordinator', files)
@@ -132,7 +134,7 @@ class RepeaterTests(unittest.TestCase):
         profile['downstream'].pop('channel', None)
         files, _ = render(profile, 'repeater')
         self.assertNotIn('bssid=', files['radio-config/wpa_supplicant.conf'])
-        self.assertIn('wlan1 wlan1-vxd auto', files['runtime/r15-radio.init'])
+        self.assertNotIn('option bssid', files['openwrt-config/r15_radio'])
         self.assertEqual(files['radio-config/upstream-ssid'], 'EXAMPLE-TENDA\n')
 
     def test_radio_uci_stores_derived_keys_and_byte_encoded_names(self):

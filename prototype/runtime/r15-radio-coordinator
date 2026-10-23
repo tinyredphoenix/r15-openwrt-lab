@@ -121,7 +121,7 @@ align_ap() {
         /^channel=/ { print "channel=" ch; n++; next }
         { print }
         END { if (n != 1) exit 1 }
-    ' /etc/r15/hostapd.conf >"$APCONF.next" || return 1
+    ' "$CONFIGDIR/hostapd.conf" >"$APCONF.next" || return 1
     mv "$APCONF.next" "$APCONF" || return 1
     start_ap
 }
@@ -256,12 +256,19 @@ coordinator_cleanup() {
     stop_owned "$APCHILD" || :
 }
 coordinator_main() {
+    CONFIGDIR=${4:-/etc/r15}
+    if [ "$CONFIGDIR" != /etc/r15 ]; then
+        case "$CONFIGDIR" in /var/run/r15-uci.*) ;; *) return 2 ;; esac
+        suffix=${CONFIGDIR#/var/run/r15-uci.}
+        printf '%s\n' "$suffix" | grep -Eq '^[A-Za-z0-9]{6}$' || return 2
+        [ -d "$CONFIGDIR" ] && [ ! -L "$CONFIGDIR" ] || return 2
+    fi
     AP=$1; STA=$2; BSSID=$(printf '%s' "$3" | tr A-F a-f)
     AUTO_BSS=0; SSID_TEXT=
     if [ "$BSSID" = auto ]; then AUTO_BSS=1; BSSID=; fi
     # Single canonical text line generated from SSID bytes, never sourced.
-    [ -r /etc/r15/upstream-ssid ] || return 1
-    IFS= read -r SSID_TEXT < /etc/r15/upstream-ssid || return 1
+    [ -r "$CONFIGDIR/upstream-ssid" ] || return 1
+    IFS= read -r SSID_TEXT < "$CONFIGDIR/upstream-ssid" || return 1
     [ -n "$SSID_TEXT" ] || return 1
     ROLE=sta; ATTACHED=0; READY=0; FAILURES=0
     NEED_REJOIN=0; REJOIN_WAIT=0; ALIGN_WAIT=0; PENDING_FREQ=; APCHILD=; STACHILD=
@@ -269,19 +276,19 @@ coordinator_main() {
     management_up || { rlog 'Wired management is not ready'; return 1; }
     [ -f /etc/r15/board-startup-verified ] || return 1
     [ -e "/sys/class/net/$AP" ] && [ -e "/sys/class/net/$STA" ] || return 1
-    [ -r /etc/r15/hostapd.conf ] && [ -r /etc/r15/wpa_supplicant.conf ] || return 1
+    [ -r "$CONFIGDIR/hostapd.conf" ] && [ -r "$CONFIGDIR/wpa_supplicant.conf" ] || return 1
     # No adoption or termination of pre-existing radio services is implemented.
     [ ! -e "/var/run/r15-wpa/$STA" ] && [ ! -e "/var/run/r15-hostapd/$AP" ] || return 1
     umask 077
     mkdir -p /var/run/r15-radio || return 1
     [ ! -L /var/run/r15-radio ] || return 1
     APCONF=/var/run/r15-radio/hostapd.conf
-    cp /etc/r15/hostapd.conf "$APCONF" || return 1
+    cp "$CONFIGDIR/hostapd.conf" "$APCONF" || return 1
     trap coordinator_cleanup EXIT
     trap 'exit 0' INT TERM
     publish_state || return 1
     start_ap
-    wpa_supplicant -Dnl80211 -i "$STA" -c /etc/r15/wpa_supplicant.conf &
+    wpa_supplicant -Dnl80211 -i "$STA" -c "$CONFIGDIR/wpa_supplicant.conf" &
     STACHILD=$!
     while kill -0 "$STACHILD" 2>/dev/null && kill -0 "$APCHILD" 2>/dev/null; do
         coordinate_tick || return 1

@@ -21,16 +21,17 @@ def check(root, output):
     checks = {}
     # OpenWrt's minimal BusyBox disables the optional --list/installer support.
     # Dispatch the required applets themselves; --help starts no networking.
-    for applet in ('ip', 'udhcpc'):
+    for applet in ('ip', 'udhcpc', 'mktemp'):
         result = invoke(root, 'bin/busybox', [applet, '--help'], accepted=(0, 1))
         if not re.search(r'Usage:\s*' + applet + r'\b', result.stdout + result.stderr):
             raise RuntimeError('Required BusyBox applet help unavailable: ' + applet)
-    checks['busybox_required_applets'] = ['ash', 'ip', 'udhcpc']
+    checks['busybox_required_applets'] = ['ash', 'ip', 'udhcpc', 'mktemp']
     repository = Path(__file__).resolve().parents[1]
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-radio-worker'])
     checks['radio_worker_busybox_syntax'] = 'pass'
     for relative in ('lib/netifd/dhcp.script', 'usr/libexec/r15-openwrt-dhcp.script',
-                     'usr/libexec/r15-subnet-check', 'usr/libexec/r15-dhcp-guard'):
+                     'usr/libexec/r15-subnet-check', 'usr/libexec/r15-dhcp-guard',
+                     'usr/libexec/r15-radio-launch'):
         invoke(root, 'bin/busybox', ['ash', '-n', root / relative])
     checks['dhcp_preflight_target_syntax'] = 'pass; no DHCP event script executed'
 

@@ -13,7 +13,7 @@ def stage(root, report):
     original = root / manifest['path']
     destination = root / 'usr/libexec/r15-openwrt-dhcp.script'
     helpers = ['r15-subnet-check', 'r15-dhcp-guard', 'r15-radio-worker',
-               'r15-radio-coordinator', 'r15-radio-config.lua']
+               'r15-radio-coordinator', 'r15-radio-config.lua', 'r15-radio-launch']
     targets = [original, destination] + [root/'usr/libexec'/x for x in helpers]
     # Reject symlinked components before any writes to the assembled tree.
     for target in targets:

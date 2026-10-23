@@ -43,6 +43,8 @@ and UTF-8 round-trip through UCI without becoming configuration directives.
 Derived keys are secrets and receive the same private-file protection as passwords.
 There is no manual channel option: discovery selects the upstream channel.
 
-This is the configuration adapter only. The current procd template still uses
-its rendered files. Transactional service reload, a LuCI form and actual radio
-apply remain pending; copying the UCI package does not apply settings yet.
+The same-radio procd template now invokes a launcher that validates UCI into a
+private RAM snapshot before starting its controller. A reload trigger tracks
+r15_radio changes. Invalid profiles start no controller; controller exit removes
+the snapshot. The launcher never restarts wired management or initializes board
+hardware. A LuCI form and actual service apply on the device remain unqualified.
