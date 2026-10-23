@@ -16,7 +16,8 @@ class DhcpStagingTests(unittest.TestCase):
         self.module=importlib.util.module_from_spec(spec);spec.loader.exec_module(self.module)
         self.repo=self.base/'repo';(self.repo/'build').mkdir(parents=True)
         self.runtime=self.repo/'prototype/runtime';self.runtime.mkdir(parents=True)
-        for name in ('r15-subnet-check','r15-dhcp-guard','r15-dhcp.script'):
+        for name in ('r15-subnet-check','r15-dhcp-guard','r15-dhcp.script',
+                     'r15-radio-worker','r15-radio-coordinator','r15-radio-config.lua'):
             (self.runtime/name).write_text('#!/bin/sh\n# inert '+name+'\n')
         self.original=self.root/'lib/netifd/dhcp.script';self.original.parent.mkdir(parents=True)
         self.payload=b'#!/bin/sh\n# inert original protocol fixture\n';self.original.write_bytes(self.payload)

@@ -213,6 +213,27 @@ echo "ready:$READY"
     if lua.stdout.strip() != 'syntax-only':
         raise RuntimeError('Unexpected Lua syntax-check result')
     checks['luci_target_lua_syntax'] = {'files': len(luci_files), 'executed_controllers': False}
+    radio_lua = invoke(root, 'usr/bin/lua', ['-', root, root / 'usr/libexec/r15-radio-config.lua'], input=r"""
+package.cpath=arg[1]..'/usr/lib/lua/?.so;'..arg[1]..'/usr/lib/lua/?/init.so'
+local radio=assert(loadfile(arg[2]))()
+assert(radio.psk('IEEE','password')=='f42c6fc52df0ebef9ebb4b90b38a5f902e83fe1b135a70e23aed762e9710a12e')
+assert(radio.control_ssid('quote'..string.char(34,92,10))=='quote'..string.char(92,34,92,92,92,110))
+assert(radio.control_ssid(string.char(195,169))==string.char(92)..'xc3'..string.char(92)..'xa9')
+local result=radio.render({band='2g',upstream_ssid='EXAMPLE',upstream_key=string.rep('a',64),
+                          ap_ssid='test\ninterface=bad',ap_key=string.rep('b',64)})
+assert(result.bssid=='auto' and result.ap=='wlan1' and result.sta=='wlan1-vxd')
+assert(not result.hostapd:find('\ninterface=bad',1,true))
+assert(result.hostapd:find('ssid2=',1,true))
+assert(not pcall(radio.render,{band='bad'}))
+assert(not pcall(radio.psk,'IEEE','short'))
+assert(not pcall(radio.render,{band='2g',upstream_ssid='a',upstream_key=string.rep('a',64),
+    ap_ssid='b',ap_key=string.rep('b',64),bssid='03:11:22:33:44:55'}))
+print('radio-config-pass')
+""")
+    if radio_lua.stdout.strip() != 'radio-config-pass':
+        raise RuntimeError('Target radio configuration/PSK check failed')
+    checks['radio_config_target_lua'] = 'pass; WPA2 known vector, encoding, validation and private config rendering only'
+
     checks['scope'] = 'Userspace execution only: no SSH listener, DHCP daemon, init, mounts, or network changes'
     checks['kernel_and_hardware_tested'] = False
     (output / 'management-checks.json').write_text(json.dumps(checks, indent=2) + '\n')

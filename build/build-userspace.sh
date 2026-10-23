@@ -48,6 +48,8 @@ fi
 [[ $(git -C "$LUCI_SOURCE" rev-parse HEAD) == "$LUCI_COMMIT" ]]
 printf 'src-link luci %s\n' "$LUCI_SOURCE" > "$SDK/feeds.conf"
 (cd "$SDK" && ./scripts/feeds update luci && ./scripts/feeds install -a -p luci)
+NIXIO_CHANGED=0
+if ! grep -qx 'CONFIG_PACKAGE_luci-lib-nixio_openssl=y' "$SDK/.config"; then NIXIO_CHANGED=1; fi
 cp "$ROOT/build/userspace.config" "$SDK/.config"
 make -C "$SDK" defconfig
 for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
@@ -58,13 +60,17 @@ for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
     CONFIG_PACKAGE_jsonfilter=y CONFIG_DROPBEAR_ED25519=y \
     CONFIG_PACKAGE_firewall=y CONFIG_PACKAGE_iptables=y CONFIG_PACKAGE_ip6tables=y \
     CONFIG_PACKAGE_luci=y CONFIG_PACKAGE_ppp=y CONFIG_PACKAGE_ppp-mod-pppoe=y \
-    CONFIG_PACKAGE_uhttpd=y CONFIG_PACKAGE_rpcd=y CONFIG_PACKAGE_libustream-openssl=y; do
+    CONFIG_PACKAGE_uhttpd=y CONFIG_PACKAGE_rpcd=y CONFIG_PACKAGE_libustream-openssl=y \
+    CONFIG_PACKAGE_luci-lib-nixio_openssl=y; do
     grep -qx "$symbol" "$SDK/.config" || { echo "Missing build setting: $symbol" >&2; exit 1; }
 done
 # Invalidate wpad only when the added patch changes. OpenWrt tracks configuration
 # changes itself; the artifact collector independently checks the compiled marker.
 if [[ "$PATCH_CHANGED" == 1 ]]; then
     make -C "$SDK" package/network/services/hostapd/clean
+fi
+if [[ "$NIXIO_CHANGED" == 1 ]]; then
+    make -C "$SDK" package/feeds/luci/luci-lib-nixio/clean
 fi
 make -C "$SDK" package/toolchain/compile -j2 V=s
 make -C "$SDK" package/network/services/hostapd/compile -j2 V=s

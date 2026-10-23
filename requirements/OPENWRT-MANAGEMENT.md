@@ -17,3 +17,9 @@ The current build is a pinned legacy userspace integration route for vendor Linu
 `build/provision-management.py` is a local private-build operation, not part of public cloud staging. It verifies an explicit owner public key, SHA-512 crypt password hash, matching HTTPS certificate/private key, management-address SAN and certificate lifetime before changing a fresh filesystem copy. It refuses symlinked destinations or a different existing administrative identity. It provisions both root authorized-key locations; the client private key is never copied. Generated files are private and no service starts.
 
 This does not qualify login behavior, SSH host identity, PID 1, early hardware initialization or update handling. The grouped target session must verify actual SSH/HTTPS/RPC operation. Never publish its output or include owner credentials in Actions artifacts.
+
+## Native radio configuration generation
+
+`r15-radio-config.lua` is a pure configuration layer for the future LuCI/UCI radio apply adapter. It uses the pinned nixio OpenSSL HMAC-SHA1 implementation for standard WPA2 PBKDF2, handles optional BSSID locks and exact control-interface SSID escaping, and emits same-radio hostapd/supplicant strings. It performs no file writes, process operations or network requests. Its output contains private PSKs and must be stored privately, not exposed as a status response.
+
+The build explicitly selects nixio's OpenSSL variant, invalidating the old variant when necessary. A target-Lua known WPA2 vector, SSID encoding and directive-injection checks are prepared in check-management.py. They must pass before this new module is called qualified; host Python tests do not execute it. The GUI save/apply, service reload, dynamic local-network policy updates and vendor driver behavior still need integration.
