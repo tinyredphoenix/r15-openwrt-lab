@@ -70,6 +70,7 @@ for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
     CONFIG_PACKAGE_luci-lib-nixio_openssl=y; do
     grep -qx "$symbol" "$SDK/.config" || { echo "Missing build setting: $symbol" >&2; exit 1; }
 done
+python3 "$ROOT/build/selected-recipes.py" "$SDK" > "$ROOT/artifacts/selected-recipes.txt"
 # Invalidate wpad only when the added patch changes. OpenWrt tracks configuration
 # changes itself; the artifact collector independently checks the compiled marker.
 if [[ "$PATCH_CHANGED" == 1 ]]; then
@@ -87,10 +88,12 @@ for package in utils/busybox system/procd system/ubox system/ubus system/uci \
     make -C "$SDK" "package/$package/compile" -j2 V=s
 done
 make -C "$SDK" package/feeds/luci/luci/compile -j2 V=s
-# Meta-package compilation does not guarantee all runtime-only executables are
-# built (for example LuCI cgi-io). Build the selected dependency set before the
-# collector verifies its closure; SDK board/kernel packages are never exported.
-make -C "$SDK" package/compile -j2 V=s
+# Build selected userspace runtime recipes, including cgi-io. A global
+# package/compile also builds unrelated SDK board/signing and kernel recipes.
+# The IPK collector below independently rejects incomplete runtime closure.
+while IFS= read -r recipe; do
+    make -C "$SDK" "$recipe" -j2 V=s
+done < "$ROOT/artifacts/selected-recipes.txt"
 python3 "$ROOT/build/collect-userspace.py" "$SDK" "$ROOT/artifacts"
 git -C "$LUCI_SOURCE" archive --format=tar.gz --prefix=luci/ "$LUCI_COMMIT" \
     > "$ROOT/artifacts/sources/luci-pinned-source.tar.gz"
