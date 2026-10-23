@@ -52,8 +52,18 @@ if [[ ! -d "$LUCI_SOURCE/.git" ]]; then
     git -C "$LUCI_SOURCE" checkout -q --detach FETCH_HEAD
 fi
 [[ $(git -C "$LUCI_SOURCE" rev-parse HEAD) == "$LUCI_COMMIT" ]]
-printf 'src-link luci %s\n' "$LUCI_SOURCE" > "$SDK/feeds.conf"
-(cd "$SDK" && ./scripts/feeds update luci && ./scripts/feeds install -a -p luci)
+# LuCI's cgi-io runtime helper lives in the separate packages feed.
+PACKAGES_SOURCE="$CACHE/packages-$PACKAGES_COMMIT"
+if [[ ! -d "$PACKAGES_SOURCE/.git" ]]; then
+    git init -q "$PACKAGES_SOURCE"
+    git -C "$PACKAGES_SOURCE" remote add origin https://github.com/openwrt/packages.git
+    git -C "$PACKAGES_SOURCE" fetch -q --depth 1 origin "$PACKAGES_COMMIT"
+    git -C "$PACKAGES_SOURCE" checkout -q --detach FETCH_HEAD
+fi
+[[ $(git -C "$PACKAGES_SOURCE" rev-parse HEAD) == "$PACKAGES_COMMIT" ]]
+printf 'src-link luci %s\nsrc-link packages %s\n' "$LUCI_SOURCE" "$PACKAGES_SOURCE" > "$SDK/feeds.conf"
+(cd "$SDK" && ./scripts/feeds update luci packages &&
+    ./scripts/feeds install -p packages cgi-io && ./scripts/feeds install -a -p luci)
 NIXIO_CHANGED=0
 if ! grep -qx 'CONFIG_PACKAGE_luci-lib-nixio_openssl=y' "$SDK/.config"; then NIXIO_CHANGED=1; fi
 cp "$ROOT/build/userspace.config" "$SDK/.config"
@@ -67,6 +77,7 @@ for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
     CONFIG_PACKAGE_firewall=y CONFIG_PACKAGE_iptables=y CONFIG_PACKAGE_ip6tables=y \
     CONFIG_PACKAGE_luci=y CONFIG_PACKAGE_ppp=y CONFIG_PACKAGE_ppp-mod-pppoe=y \
     CONFIG_PACKAGE_uhttpd=y CONFIG_PACKAGE_rpcd=y CONFIG_PACKAGE_libustream-openssl=y \
+    CONFIG_PACKAGE_cgi-io=y \
     CONFIG_PACKAGE_luci-lib-nixio_openssl=y; do
     grep -qx "$symbol" "$SDK/.config" || { echo "Missing build setting: $symbol" >&2; exit 1; }
 done
@@ -97,6 +108,8 @@ done < "$ROOT/artifacts/selected-recipes.txt"
 python3 "$ROOT/build/collect-userspace.py" "$SDK" "$ROOT/artifacts"
 git -C "$LUCI_SOURCE" archive --format=tar.gz --prefix=luci/ "$LUCI_COMMIT" \
     > "$ROOT/artifacts/sources/luci-pinned-source.tar.gz"
+git -C "$PACKAGES_SOURCE" archive --format=tar.gz --prefix=packages/ "$PACKAGES_COMMIT" net/cgi-io \
+    > "$ROOT/artifacts/sources/cgi-io-pinned-recipe.tar.gz"
 python3 "$ROOT/build/stage-dhcp-guard.py" "$ROOT/artifacts/rootfs" "$ROOT/artifacts/dhcp-guard-staging.json"
 python3 "$ROOT/build/stage-common-runtime.py" "$SOURCE/package/base-files/files" \
     "$ROOT/artifacts/rootfs" "$ROOT/artifacts/common-runtime.json"
