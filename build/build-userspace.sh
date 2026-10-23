@@ -20,6 +20,12 @@ if [[ ! -d "$SDK/staging_dir" ]]; then
     mkdir -p "$SDK"
     tar -xJf "$CACHE/$SDK_NAME" --strip-components=1 -C "$SDK"
 fi
+# Core recipes such as wireless-regdb invoke the SDK host Python alias.
+# The portable SDK/cache can carry a missing or stale builder-local link.
+if [[ ! -e "$SDK/staging_dir/host/bin/python" ]]; then
+    mkdir -p "$SDK/staging_dir/host/bin"
+    ln -sfn "$(command -v python3)" "$SDK/staging_dir/host/bin/python"
+fi
 if [[ ! -d "$SOURCE/.git" ]]; then
     git init -q "$SOURCE"
     git -C "$SOURCE" remote add origin https://github.com/openwrt/openwrt.git
