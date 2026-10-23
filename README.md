@@ -41,6 +41,8 @@ For a small local download, run **Actions → Export compact research runtime** 
 
 The runtime includes five hash-pinned generic OpenWrt shell helpers used by init scripts and hotplug, with BusyBox syntax checks. These provide service plumbing only. Boot entrypoints, filesystem mounts and R15 switch initialization remain unimplemented; SDK board base-files, generic wireless startup and firmware upgraders are excluded.
 
+The [boot integration audit](requirements/BOOT-INTEGRATION.md) records the actual procd entrypoints, missing service enablement, generated package service accounts, and vendor-kernel overlay/watchdog differences. Service-account password fields are locked; owner SSH access still requires provisioning and testing.
+
 The [recovery and hardware acceptance requirements](requirements/RECOVERY-AND-HARDWARE.md) track wired failsafe, independent restoration to stock, safe firmware updates, power/watchdog behavior, LEDs, Ethernet, radio RX/TX, scanning, broadcasting and Wi-Fi security. These are pre-flash requirements, not completed hardware tests.
 
 The [stock boot-mechanism findings](requirements/STOCK-BOOT-MECHANISM.md) document paired logical kernel/rootfs sections, `sw_tryactive`/`sw_commit`, and the inner-record integrity checker. Bootloader rollback and the live flash layout remain unverified.

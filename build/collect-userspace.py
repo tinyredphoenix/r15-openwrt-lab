@@ -105,6 +105,52 @@ def inspect_elf(data):
     return {'class': 'ELF32', 'byte_order': 'big', 'machine': 'MIPS'}
 
 
+def stage_accounts(metadata, root):
+    """Honor explicit package identities without executing package postinsts."""
+    groups = {'root': 0, 'nogroup': 65534}
+    users = {'root': (0, 0, '/root', '/bin/ash'),
+             'nobody': (65534, 65534, '/var', '/bin/false')}
+    for fields in metadata.values():
+        for token in fields.get('Require-User', '').split():
+            match = re.fullmatch(r'(?:([a-z_][a-z0-9_-]*)=([0-9]+))?:([a-z_][a-z0-9_-]*)=([0-9]+)', token)
+            if not match:
+                raise ValueError('Unsupported package identity: ' + token)
+            user, uid, group, gid = match.groups()
+            gid = int(gid)
+            if not 0 < gid < 65534 or group in ('root', 'nogroup'):
+                raise ValueError('Reserved package group: ' + token)
+            if ((group in groups and groups[group] != gid) or
+                    any(g == gid and n != group for n, g in groups.items())):
+                raise ValueError('Conflicting package group: ' + token)
+            groups[group] = gid
+            if user:
+                uid = int(uid)
+                if not 0 < uid < 65534 or user in ('root', 'nobody'):
+                    raise ValueError('Reserved package user: ' + token)
+                value = (uid, gid, '/var/run/' + user, '/bin/false')
+                if ((user in users and users[user] != value) or
+                        any(v[0] == uid and n != user for n, v in users.items())):
+                    raise ValueError('Conflicting package user: ' + token)
+                users[user] = value
+    contents = {
+        'passwd': ''.join(f'{n}:x:{u}:{g}:{n}:{h}:{s}\n' for n, (u, g, h, s) in sorted(users.items())),
+        'group': ''.join(f'{n}:x:{g}:\n' for n, g in sorted(groups.items())),
+        'shadow': ''.join(f'{n}:*:0:0:99999:7:::\n' for n in sorted(users)),
+    }
+    for name in contents:
+        dest = safe_path(root, 'etc/' + name)
+        if dest.exists() or dest.is_symlink():
+            raise ValueError('Refusing account-file collision: ' + name)
+    for name, data in contents.items():
+        dest = root / 'etc' / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(data)
+        dest.chmod(0o600 if name == 'shadow' else 0o644)
+    return {'users': sorted(users), 'groups': sorted(groups),
+            'password_hashes_included': False, 'password_fields_locked': True,
+            'package_postinsts_executed': False, 'owner_ssh_key_provisioned': False}
+
+
 def collect(sdk, output):
     root = output / 'rootfs'
     if root.exists():
@@ -144,6 +190,7 @@ def collect(sdk, output):
     for prefix in ('wpad-basic_', 'wpa-cli_', 'hostapd-utils_', 'libc_'):
         if not any(p['name'].startswith(prefix) for p in records):
             raise ValueError('Missing compiled package: ' + prefix)
+    accounts = stage_accounts({n: metadata[n] for n in selected}, root)
     elf = []
     for path in sorted(root.rglob('*')):
         if path.is_symlink() or not path.is_file():
@@ -173,6 +220,7 @@ def collect(sdk, output):
               'soc_compatibility': 'ISA candidate for RTL8198D; driver/runtime compatibility unverified',
               'association_patch_marker_present': True, 'packages': records, 'elf_files': elf}
     result['root_packages'] = ROOT_PACKAGES
+    result['system_accounts'] = accounts
     result['unverified_kernel_package_dependencies'] = sorted(external_kernel)
     result['kernel_package_dependencies_satisfied'] = False
     result['boot_framework_complete'] = False
