@@ -77,7 +77,7 @@ for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
     CONFIG_PACKAGE_firewall=y CONFIG_PACKAGE_iptables=y CONFIG_PACKAGE_ip6tables=y \
     CONFIG_PACKAGE_luci=y CONFIG_PACKAGE_ppp=y CONFIG_PACKAGE_ppp-mod-pppoe=y \
     CONFIG_PACKAGE_uhttpd=y CONFIG_PACKAGE_rpcd=y CONFIG_PACKAGE_libustream-openssl=y \
-    CONFIG_PACKAGE_cgi-io=y \
+    CONFIG_PACKAGE_cgi-io=y CONFIG_PACKAGE_luci-compat=y \
     CONFIG_PACKAGE_luci-lib-nixio_openssl=y; do
     grep -qx "$symbol" "$SDK/.config" || { echo "Missing build setting: $symbol" >&2; exit 1; }
 done
@@ -110,6 +110,7 @@ git -C "$LUCI_SOURCE" archive --format=tar.gz --prefix=luci/ "$LUCI_COMMIT" \
     > "$ROOT/artifacts/sources/luci-pinned-source.tar.gz"
 git -C "$PACKAGES_SOURCE" archive --format=tar.gz --prefix=packages/ "$PACKAGES_COMMIT" net/cgi-io \
     > "$ROOT/artifacts/sources/cgi-io-pinned-recipe.tar.gz"
+python3 "$ROOT/build/stage-luci-radio.py" "$ROOT/artifacts/rootfs" "$ROOT/artifacts/luci-radio-staging.json"
 python3 "$ROOT/build/stage-dhcp-guard.py" "$ROOT/artifacts/rootfs" "$ROOT/artifacts/dhcp-guard-staging.json"
 python3 "$ROOT/build/stage-common-runtime.py" "$SOURCE/package/base-files/files" \
     "$ROOT/artifacts/rootfs" "$ROOT/artifacts/common-runtime.json"

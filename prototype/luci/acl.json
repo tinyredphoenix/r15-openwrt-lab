@@ -1,0 +1,7 @@
+{
+  "luci-app-r15-repeater": {
+    "description": "Configure R15 wireless repeating",
+    "read": {"uci": ["r15_radio"]},
+    "write": {"uci": ["r15_radio"]}
+  }
+}

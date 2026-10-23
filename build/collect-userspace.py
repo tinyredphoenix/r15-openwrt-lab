@@ -14,7 +14,7 @@ import tarfile
 ROOT_PACKAGES = ['wpad-basic', 'wpa-cli', 'hostapd-utils', 'busybox', 'procd',
                  'ubox', 'logd', 'ubus', 'ubusd', 'uci', 'netifd', 'dropbear',
                  'dnsmasq', 'jsonfilter', 'firewall', 'iptables', 'ip6tables',
-                 'luci', 'ppp', 'ppp-mod-pppoe', 'libustream-openssl', 'openssl-util']
+                 'luci', 'luci-compat', 'ppp', 'ppp-mod-pppoe', 'libustream-openssl', 'openssl-util']
 
 def safe_path(root, name):
     path = PurePosixPath(name)

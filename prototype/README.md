@@ -48,3 +48,11 @@ private RAM snapshot before starting its controller. A reload trigger tracks
 r15_radio changes. Invalid profiles start no controller; controller exit removes
 the snapshot. The launcher never restarts wired management or initializes board
 hardware. A LuCI form and actual service apply on the device remain unqualified.
+
+The custom LuCI repeater page is staged with a menu ACL restricted to r15_radio.
+It edits band, upstream/local names and passwords, and an optional BSSID lock.
+It exposes no manual channel setting or board/interface creation. Changing a name
+while retaining its old derived PSK is rejected; the owner must enter the actual
+password again. The standard authenticated CBI save/apply mechanism uses the
+radio service's reload trigger. Page syntax/validation and actual web/apply tests
+remain separate qualifications; the page has not been opened on the router yet.

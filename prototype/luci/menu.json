@@ -1,0 +1,8 @@
+{
+  "admin/network/r15_repeater/*": {
+    "title": "Wireless repeater",
+    "order": 35,
+    "action": {"type": "cbi", "path": "r15/repeater", "post": {"cbi.submit": true}},
+    "depends": {"acl": ["luci-app-r15-repeater"], "uci": {"r15_radio": true}}
+  }
+}

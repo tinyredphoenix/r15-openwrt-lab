@@ -270,6 +270,56 @@ print('radio-config-pass')
         raise RuntimeError('Target radio configuration/PSK check failed')
     checks['radio_config_target_lua'] = 'pass; WPA2 known vector, encoding, validation and private config rendering only'
 
+    # Exercise our actual model's validators with inert CBI adapters. This is
+    # not an HTTP/CSRF/RPC or service-apply test; no real cursor is committed.
+    model = invoke(root, 'usr/bin/lua', ['-', root / 'usr/lib/lua/luci/model/cbi/r15/repeater.lua'], input=r"""
+local original={upstream_ssid_hex='6f6c64',upstream_key=string.rep('a',64),
+    ap_ssid_hex='6170',ap_key=string.rep('b',64)}
+local input={upstream_ssid_hex='old',ap_ssid_hex='ap'}
+local options={}
+translate=function(value) return value end
+Flag={};ListValue={};Value={};NamedSection={}
+Map=function(name)
+    assert(name=='r15_radio')
+    local map={uci={get=function(self,p,s,key) return original[key] end,
+        set=function(self,p,s,key,value) original[key]=value; return true end}}
+    function map:section()
+        return {option=function(self,kind,name)
+            local option={option=name,value=function() end,
+                formvalue=function() return input[name] end}
+            options[name]=option
+            return option
+        end}
+    end
+    return map
+end
+assert(loadfile(arg[1]))()
+local name=options.upstream_ssid_hex
+local key=options.upstream_key
+assert(name:cfgvalue('repeater')=='old')
+assert(name:validate('')==nil and name:validate(string.rep('a',33))==nil)
+assert(key:validate('short','repeater')==nil)
+assert(key:validate(string.rep('a',64),'repeater')==string.rep('a',64))
+input.upstream_ssid_hex='new'
+assert(name:write('repeater','new'))
+assert(original.upstream_ssid_hex=='6e6577')
+assert(key:validate(string.rep('a',64),'repeater')==nil)
+assert(key:validate(string.rep('A',64),'repeater')==nil)
+assert(key:validate('new-password','repeater')=='new-password')
+assert(name:write('repeater',"quote'"..string.char(10)))
+assert(original.upstream_ssid_hex=='71756f7465270a')
+local pin=options.bssid
+assert(pin:validate('')=='')
+assert(pin:validate('02:11:22:33:44:55')=='02:11:22:33:44:55')
+assert(pin:validate('03:11:22:33:44:55')==nil)
+assert(pin:validate('00:00:00:00:00:00')==nil)
+assert(pin:validate('02:11:22:33:44:55;reboot')==nil)
+print('luci-radio-model-pass')
+""")
+    if model.stdout.strip() != 'luci-radio-model-pass':
+        raise RuntimeError('LuCI radio model validation check failed')
+    checks['luci_radio_model_target'] = 'pass; encoding, stale PSK and invalid credential/BSSID rejection with inert CBI adapters; no HTTP or apply test'
+
     checks['scope'] = 'Userspace execution only: no SSH listener, DHCP daemon, init, mounts, or network changes'
     checks['kernel_and_hardware_tested'] = False
     (output / 'management-checks.json').write_text(json.dumps(checks, indent=2) + '\n')
