@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Compile userspace only. Never build a kernel or a router upgrade image.
+# Build selected SDK research packages, never a kernel/image target.
+# Any dependency kmods remain in the SDK and are excluded from the exported tree.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 source "$ROOT/build/pins.env"
@@ -74,6 +75,10 @@ for package in utils/busybox system/procd system/ubox system/ubus system/uci \
     make -C "$SDK" "package/$package/compile" -j2 V=s
 done
 make -C "$SDK" package/feeds/luci/luci/compile -j2 V=s
+# Meta-package compilation does not guarantee all runtime-only executables are
+# built (for example LuCI cgi-io). Build the selected dependency set before the
+# collector verifies its closure; SDK board/kernel packages are never exported.
+make -C "$SDK" package/compile -j2 V=s
 python3 "$ROOT/build/collect-userspace.py" "$SDK" "$ROOT/artifacts"
 git -C "$LUCI_SOURCE" archive --format=tar.gz --prefix=luci/ "$LUCI_COMMIT" \
     > "$ROOT/artifacts/sources/luci-pinned-source.tar.gz"

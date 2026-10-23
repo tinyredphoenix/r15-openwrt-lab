@@ -11,3 +11,9 @@ LuCI's existing generic wireless pages cannot be assumed to configure these vend
 Do not enable a generic SDK board initializer, flash writer or sysupgrade handler for this R15. The final device-specific update path must validate the actual image format and protected regions. Mac recovery HTTP entry is proven; actual restoration is untested and is a strong owner preference, not an owner-imposed absolute gate. Keep recovery limits visible while making autonomous release decisions from actual evidence.
 
 The current build is a pinned legacy userspace integration route for vendor Linux 4.4.140; it is not a current official OpenWrt R15 target. Modern-kernel driver support is a separate unqualified route. Full boot, board initialization, authentication and long-running operation require the grouped device qualification phase.
+
+## Private provisioning helper
+
+`build/provision-management.py` is a local private-build operation, not part of public cloud staging. It verifies an explicit owner public key, SHA-512 crypt password hash, matching HTTPS certificate/private key, management-address SAN and certificate lifetime before changing a fresh filesystem copy. It refuses symlinked destinations or a different existing administrative identity. It provisions both root authorized-key locations; the client private key is never copied. Generated files are private and no service starts.
+
+This does not qualify login behavior, SSH host identity, PID 1, early hardware initialization or update handling. The grouped target session must verify actual SSH/HTTPS/RPC operation. Never publish its output or include owner credentials in Actions artifacts.
