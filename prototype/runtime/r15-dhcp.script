@@ -1,0 +1,16 @@
+#!/bin/sh
+# Candidate OpenWrt dhcp.script wrapper. Not installed on the stock router.
+# Delegate all original protocol work; validate WWAN leases before publication.
+BASE=/usr/libexec/r15-openwrt-dhcp.script
+[ -r "$BASE" ] || exit 1
+case "${INTERFACE:-}:$1" in
+    wwan:bound|wwan:renew)
+        if ! /bin/sh /usr/libexec/r15-dhcp-guard \
+            /etc/r15/protected-subnets /usr/libexec/r15-subnet-check; then
+            logger -t r15-dhcp 'Rejected unsafe or malformed upstream lease'
+            # Retire any previous accepted lease; never delegate unsafe bound.
+            exec /bin/sh "$BASE" deconfig
+        fi
+        ;;
+esac
+exec /bin/sh "$BASE" "$@"

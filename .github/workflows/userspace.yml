@@ -23,6 +23,8 @@ jobs:
           sh -n prototype/runtime/r15-radio-worker
           sh -n prototype/runtime/r15-radio-coordinator
           sh -n prototype/runtime/r15-subnet-check
+          sh -n prototype/runtime/r15-dhcp-guard
+          sh -n prototype/runtime/r15-dhcp.script
           bash -n build/build-userspace.sh
       - name: Build dependencies
         run: |

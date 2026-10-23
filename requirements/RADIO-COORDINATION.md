@@ -43,3 +43,11 @@ The same-radio coordinator now checks the learned IPv4 connected subnet against 
 This is not atomic DHCP route prevention: netifd may install routes before rejection; supplied classless routes are not audited; cross-radio workers do not invoke this guard yet. Management/data routing isolation still needs completion. The new revision has host tests; prior successful cloud reports apply to their recorded commits, not these later changes until a new build passes.
 
 Final automatic SSID/channel requirements and optional PPPoE are specified in [FEATURE-COMPATIBILITY.md](FEATURE-COMPATIBILITY.md). SSID-only selection is now implemented offline; limited channels, regulatory handling and hardware behavior still leave the final requirements partially open.
+
+## Pre-publication DHCP integration
+
+The next build revision stages `r15-dhcp.script` at OpenWrt's existing DHCP event path, preserving the exact hash-pinned original as `/usr/libexec/r15-openwrt-dhcp.script`. WWAN bound/renew events first run `r15-dhcp-guard`. It rejects conflicting connected subnets, malformed masks/addresses, protected off-link gateways and classless routes intersecting management/client ranges. An unsafe renewal delegates `deconfig`, withdrawing the old accepted lease rather than publishing the new one. Other interfaces/events keep the original OpenWrt behavior. No DHCP process or event script is executed by build staging.
+
+This moves validation before `proto_send_update`; `/etc/udhcpc.user` would run too late. It is intended to close the earlier post-lease rejection window when correctly deployed. That behavior is host-tested, not yet proved against target netifd/udhcpc. The original script must match `build/dhcp-script-manifest.json` exactly. A missing policy/helper rejects the WWAN lease. Current guard scope requires ordinary unicast IPv4 leases and rejects unchecked CUSTOMROUTES; IPv6/6rd, custom-route configuration and other protocol capabilities require separate integration review.
+
+The build stores a staging report and runs target BusyBox syntax checks without starting DHCP. Review bundles include wrappers and policy inputs but remain non-installable. Existing router RAM tests and immutable checkpoints were not modified.

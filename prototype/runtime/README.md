@@ -33,3 +33,5 @@ Tests run fake shell adapters and never contact the router. Target BusyBox/jsonf
 The same-radio lease guard also requires `/usr/libexec/r15-subnet-check` and the renderer's `radio-config/protected-subnets` at `/etc/r15/protected-subnets`. It rejects connected-subnet overlaps after DHCP; it does not eliminate the route-installation window or inspect classless routes. See the phase-2 update in RADIO-COORDINATION.md.
 
 Automatic mode also requires `radio-config/upstream-ssid` at `/etc/r15/upstream-ssid`. This is a literal encoded SSID line, never sourced or evaluated. Bootstrap AP channels are internal defaults; actual same-radio operation follows fresh scan/negotiated frequency.
+
+The pre-publication DHCP wrapper and `r15-dhcp-guard` are staged by `build/stage-dhcp-guard.py`, preserving the exact pinned original DHCP script. They run no services during build staging. Missing policy rejects a WWAN lease; the correct private policy must be provisioned by future packaging. Host tests cover valid/invalid bound and renew dispatch; target runtime integration remains untested.

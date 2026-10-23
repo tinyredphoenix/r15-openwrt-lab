@@ -29,6 +29,11 @@ def check(root, output):
     repository = Path(__file__).resolve().parents[1]
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-radio-worker'])
     checks['radio_worker_busybox_syntax'] = 'pass'
+    for relative in ('lib/netifd/dhcp.script', 'usr/libexec/r15-openwrt-dhcp.script',
+                     'usr/libexec/r15-subnet-check', 'usr/libexec/r15-dhcp-guard'):
+        invoke(root, 'bin/busybox', ['ash', '-n', root / relative])
+    checks['dhcp_preflight_target_syntax'] = 'pass; no DHCP event script executed'
+
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-radio-coordinator'])
     checks['radio_coordinator_busybox_syntax'] = 'pass'
     subnet_helper = repository / 'prototype/runtime/r15-subnet-check'

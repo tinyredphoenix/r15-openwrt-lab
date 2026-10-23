@@ -188,6 +188,8 @@ def render(profile, stage):
         files["radio-config/protected-subnets"] = str(management.network) + "\n" + str(lan.network) + "\n"
         files["runtime/r15-subnet-check"] = (
             Path(__file__).parent / "runtime/r15-subnet-check").read_text()
+        for helper in ("r15-dhcp-guard", "r15-dhcp.script"):
+            files["runtime/" + helper] = (Path(__file__).parent / "runtime" / helper).read_text()
         files["runtime/r15-radio-worker"] = (
             Path(__file__).parent / "runtime/r15-radio-worker").read_text()
         files["runtime/r15-radio.init"] = (

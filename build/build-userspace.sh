@@ -60,6 +60,7 @@ for package in utils/busybox system/procd system/ubox system/ubus system/uci \
     make -C "$SDK" "package/$package/compile" -j2 V=s
 done
 python3 "$ROOT/build/collect-userspace.py" "$SDK" "$ROOT/artifacts"
+python3 "$ROOT/build/stage-dhcp-guard.py" "$ROOT/artifacts/rootfs" "$ROOT/artifacts/dhcp-guard-staging.json"
 python3 "$ROOT/build/stage-common-runtime.py" "$SOURCE/package/base-files/files" \
     "$ROOT/artifacts/rootfs" "$ROOT/artifacts/common-runtime.json"
 python3 - "$ROOT/artifacts/build-report.json" "$ROOT/artifacts/common-runtime.json" <<'PY'

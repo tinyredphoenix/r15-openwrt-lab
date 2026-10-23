@@ -1,0 +1,5 @@
+{
+  "path": "lib/netifd/dhcp.script",
+  "sha256": "7426049620ae2bca29924ec829802074a06d3d279e1bc7c54383b31c7cdc5cf5",
+  "scope": "Pinned collected OpenWrt DHCP event script; wrapper staging only, no runtime qualification"
+}
