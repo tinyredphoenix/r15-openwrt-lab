@@ -1,0 +1,30 @@
+{
+  "commit": "57a6d97ddf8f6541a52e0f8fad8c6f47685a1bc3",
+  "files": [
+    {
+      "path": "etc/rc.common",
+      "sha256": "ebeeedc132a75942ce876465e4636a75f745e468c573fdf9ad058e57e58a0341",
+      "bytes": 3233
+    },
+    {
+      "path": "lib/functions.sh",
+      "sha256": "b2b07ca83222f8677f8117e4ed8bff162ef9e6ad0aadaa42d6248c5865831406",
+      "bytes": 8418
+    },
+    {
+      "path": "lib/functions/network.sh",
+      "sha256": "83d48f03be77e57eb9ff1a044adf84847273375750eb6d94e9f906d5dd8c45d5",
+      "bytes": 8040
+    },
+    {
+      "path": "lib/functions/service.sh",
+      "sha256": "afb750abd9c4b4eeb1e8dc5eb9f66c7d47774782494f2c168183390803db3b91",
+      "bytes": 2748
+    },
+    {
+      "path": "sbin/hotplug-call",
+      "sha256": "4cdc5b9683d615abd0be579fccbd3b8720b0bd57346e5fe45cea7a7a377845ff",
+      "bytes": 336
+    }
+  ]
+}

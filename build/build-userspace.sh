@@ -60,6 +60,19 @@ for package in utils/busybox system/procd system/ubox system/ubus system/uci \
     make -C "$SDK" "package/$package/compile" -j2 V=s
 done
 python3 "$ROOT/build/collect-userspace.py" "$SDK" "$ROOT/artifacts"
+python3 "$ROOT/build/stage-common-runtime.py" "$SOURCE/package/base-files/files" \
+    "$ROOT/artifacts/rootfs" "$ROOT/artifacts/common-runtime.json"
+python3 - "$ROOT/artifacts/build-report.json" "$ROOT/artifacts/common-runtime.json" <<'PY'
+import json, sys
+from pathlib import Path
+path = Path(sys.argv[1])
+report = json.loads(path.read_text())
+report['common_service_helpers'] = json.loads(Path(sys.argv[2]).read_text())
+root = path.parent / 'rootfs'
+report['regular_file_bytes'] = sum(p.stat().st_size for p in root.rglob('*')
+                                 if p.is_file() and not p.is_symlink())
+path.write_text(json.dumps(report, indent=2) + '\n')
+PY
 # This hostapd version intentionally exits 1 for -v (hostapd/main.c).
 # Require both that exact status and its expected output, not a blanket || true.
 status=0

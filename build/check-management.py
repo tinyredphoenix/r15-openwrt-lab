@@ -31,6 +31,10 @@ def check(root, output):
     checks['radio_worker_busybox_syntax'] = 'pass'
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-health'])
     checks['health_probe_busybox_syntax'] = 'pass'
+    helpers = json.loads((repository / 'build/common-runtime-manifest.json').read_text())
+    for record in helpers['files']:
+        invoke(root, 'bin/busybox', ['ash', '-n', root / record['path']])
+    checks['common_service_helper_busybox_syntax'] = [r['path'] for r in helpers['files']]
     # Source-verified -h exits before fw3 builds state, connects to ubus or
     # touches netfilter. Never call start/stop/flush/print under user emulation.
     firewall = invoke(root, 'sbin/fw3', ['-h'], accepted=(1,))
