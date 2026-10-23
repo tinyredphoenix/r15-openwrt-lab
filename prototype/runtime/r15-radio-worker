@@ -7,6 +7,12 @@ management_up() {
     ubus -t 2 call network.interface.mgmt status 2>/dev/null |
         jsonfilter -e '@.up' 2>/dev/null | grep -qx true
 }
+station_carrier() { cat "/sys/class/net/$STA/carrier" 2>/dev/null; }
+station_ready() {
+    [ "$(station_carrier)" = 1 ] &&
+        wpa_cli -p /var/run/r15-wpa -i "$STA" status 2>/dev/null |
+        grep -qx 'wpa_state=COMPLETED'
+}
 valid_pair() {
     case "$AP:$STA" in
         wlan1:wlan0-vxd|wlan0:wlan1-vxd) return 0 ;;
@@ -80,8 +86,7 @@ main() {
         wpa_supplicant -Dnl80211 -i "$STA" -c /etc/r15/wpa_supplicant.conf &
         CHILD=$!
         while kill -0 "$CHILD" 2>/dev/null; do
-            if wpa_cli -p /var/run/r15-wpa -i "$STA" status 2>/dev/null |
-                grep -qx 'wpa_state=COMPLETED'; then
+            if station_ready; then
                 handle_link connected || :
             else
                 handle_link disconnected

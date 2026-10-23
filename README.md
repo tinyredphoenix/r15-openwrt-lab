@@ -1,20 +1,20 @@
 # D-Link R15 A1 OpenWrt research
 
-Work toward a minimal cross-radio wireless repeater for the Indian R15 A1, with wired management independent of the Wi-Fi uplink. **No bootable or flashable R15 firmware is available here. Do not upload these artifacts to a router.**
+Work toward a minimal routed wireless repeater for the Indian R15 A1, with wired management independent of the Wi-Fi uplink. **No bootable or flashable R15 firmware is available here. Do not upload these artifacts to a router.**
 
-Observed stock firmware 1.06.10 uses RTL8198D, big-endian MIPS interAptiv, Linux 4.4.140; RTL8852AE (`wlan0`, PCI 10ec:8852) and RTL8192FE (`wlan1`, PCI 10ec:818c). Both create VXD client interfaces. Physical RAM capacity is not established. These observations do not establish OpenWrt driver compatibility.
+Observed stock firmware 1.06.10 uses RTL8198D, big-endian MIPS interAptiv, Linux 4.4.140; RTL8852AE (`wlan0`, PCI 10ec:8852) and RTL8192FE (`wlan1`, PCI 10ec:818c). Both create VXD client interfaces. The running stock kernel reports 256 MiB physical RAM (about 238.8 MiB MemTotal). These observations do not establish OpenWrt driver compatibility.
 
 ## What is implemented
 
 - A local configuration renderer with separate wired management, SSH keys and DHCP that does not replace the laptop's Internet route.
-- A radio worker with separate AP and supplicant supervision, netifd uplink attachment after association, disconnect cleanup and reconnect handling. It does not restart wired management.
+- Radio lifecycle components: separate workers for cross-radio operation and a single paired controller for same-radio channel alignment, carrier/reassociation handling and netifd readiness. The new controller has offline tests only and does not restart wired management.
 - A read-only health probe for uptime, memory, Ethernet/Wi-Fi packet counters, exposed LED devices and voltage sensors. Missing sensors remain unknown; LED control and antenna-chain testing still require board verification.
 - A read-only checker for the observed decrypted stock image's inner record lengths and checksums. It rejects corruption without claiming authenticity or flash compatibility; it always reports `flashable: false`.
 - A pinned Linux SDK build for patched wireless tools and the management foundation: BusyBox, procd, ubus, UCI, netifd, Dropbear, dnsmasq and jsonfilter.
-- Firewall3 and legacy IPv4/IPv6 iptables are selected for the generated routing/NAT policy. Their kernel dependencies are recorded as unverified requirements; SDK kernel modules are excluded. Version/help checks cannot establish packet filtering on the R15.
+- Firewall3 and legacy IPv4/IPv6 iptables are selected for the generated routing/NAT policy. Their kernel dependencies are recorded as unverified requirements; SDK kernel modules are excluded. Version/help checks alone cannot establish filtering. Separately, retained-kernel RAM tests exercised temporary IPv4 filtering/NAT and DNS/DHCP; they do not qualify the generated firewall or custom boot.
 - GitHub Actions caches the SDK/compiler and dependency build tree. The compiler is the official OpenWrt 21.02.7 `realtek/generic` MIPS big-endian userspace SDK, **not an R15 board target**.
 
-The build verifies SDK SHA-256, configuration retention, ELF32 big-endian MIPS output, the compiled association-response marker, and tool version execution using QEMU user emulation. It checks the radio worker with target BusyBox ash syntax parsing and exercises Ed25519 key generation, parses the rendered management UCI files, and checks dnsmasq syntax with default-route/DNS advertising disabled. Test keys are temporary and never published. No SSH or DHCP server is started by these checks. It produces IPKs, source archives with the distribution package recipes/patches, and a partial userspace tree. **QEMU version tests do not test Wi-Fi, Ethernet, booting or recovery.** Kernel modules, router image packaging and the SDK target's unrelated board base-files are excluded. The partial tree lacks the R15 boot framework.
+The build verifies SDK SHA-256, configuration retention, ELF32 big-endian MIPS output, the compiled association-response marker, and tool version execution using QEMU user emulation. It checks the radio worker with target BusyBox ash syntax parsing and exercises Ed25519 key generation, parses the rendered management UCI files, and checks dnsmasq syntax with default-route/DNS advertising disabled. Test keys are temporary and never published. No SSH or DHCP server is started by these checks. It produces IPKs, source archives with the distribution package recipes/patches, and a partial userspace tree. **QEMU version tests do not test Wi-Fi, Ethernet, booting or recovery.** Kernel modules, router image packaging and the SDK target's unrelated board base-files are excluded. The partial tree lacks the R15 boot framework. The new coordinator is a source-level integration component, not target-tested boot code.
 
 The old userspace baseline is an integration experiment with a vendor 4.4 kernel, not a maintained production release. No credentials, settings exports, owner logs, calibration tables or stock/vendor binaries belong in this repository or Actions cache.
 
@@ -57,3 +57,7 @@ R15 board initialization and per-unit MAC/calibration handling; complete runtime
 - [RTL960X OpenWrt platform work](https://github.com/jameywine/openwrt/tree/rtl9607c-dev), relevant to a future modern-kernel route; not proof of R15 radio support.
 
 Original project glue is MIT licensed; imported hostapd patch retains BSD-3-Clause terms. See `LICENSE` and `patches/NOTICE.md`. Downloaded OpenWrt sources and packages retain their own licenses. This project is not affiliated with D-Link, Realtek, OpenWrt or the reference port's authors.
+
+## Radio integration status
+
+Private owner-authorized tests separately qualified bounded 5 GHz and 2.4 GHz routed repeating on the stock kernel/vendor drivers, using compiled station and DHCP/DNS tools with OEM AP services. An AP restart exposed a channel-selection/carrier failure, corrected manually in that experiment. The [same-radio coordinator](requirements/RADIO-COORDINATION.md) now models that recovery in code and renders a single-owner service. No private credentials, router captures or calibration data are included here. Full custom boot and target execution of the coordinator remain untested.

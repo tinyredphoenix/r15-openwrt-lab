@@ -1,0 +1,231 @@
+#!/bin/sh
+# Research-only same-radio coordinator. Board/platform boot is a prerequisite.
+# Owns its two foreground children; never restarts management or loads drivers.
+
+# Reuse the narrowly scoped management/netifd functions; do not run worker main.
+_coordinator_source_only=${R15_SOURCE_ONLY:-0}
+R15_SOURCE_ONLY=1
+. "${R15_WORKER_LIBRARY:-/usr/libexec/r15-radio-worker}"
+R15_SOURCE_ONLY=$_coordinator_source_only
+
+wcli() { wpa_cli -p /var/run/r15-wpa -i "$STA" "$@"; }
+apcli() { hostapd_cli -p /var/run/r15-hostapd -i "$AP" "$@"; }
+field() { sed -n "s/^$1=//p" | head -n 1; }
+read_station() {
+    STATION=$(wcli status 2>/dev/null) || STATION=
+    STATE=$(printf '%s\n' "$STATION" | field wpa_state)
+    SFREQ=$(printf '%s\n' "$STATION" | field freq)
+    SBSSID=$(printf '%s\n' "$STATION" | field bssid | tr A-F a-f)
+    CARRIER=$(cat "/sys/class/net/$STA/carrier" 2>/dev/null)
+}
+read_ap() {
+    APSTATUS=$(apcli status 2>/dev/null) || APSTATUS=
+    APSTATE=$(printf '%s\n' "$APSTATUS" | field state)
+    AFREQ=$(printf '%s\n' "$APSTATUS" | field freq)
+}
+scan_frequency() {
+    BSS=$(wcli bss "$BSSID" 2>/dev/null) || return 1
+    found=$(printf '%s\n' "$BSS" | field bssid | tr A-F a-f)
+    [ "$found" = "$BSSID" ] || return 1
+    AGE=$(printf '%s\n' "$BSS" | field age)
+    SCANFREQ=$(printf '%s\n' "$BSS" | field freq)
+    case "$AGE" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$AGE" -le 30 ] || return 1
+    frequency_channel "$SCANFREQ" >/dev/null
+}
+frequency_channel() {
+    # Initial conservative non-DFS scope; hostapd/driver still enforce IN rules.
+    case "$AP:$1" in
+        wlan1:24[0-9][0-9])
+            [ "$1" -ge 2412 ] && [ "$1" -le 2472 ] || return 1
+            [ $((($1 - 2407) % 5)) -eq 0 ] || return 1
+            echo $((($1 - 2407) / 5)) ;;
+        wlan0:5180) echo 36 ;;
+        wlan0:5200) echo 40 ;;
+        wlan0:5220) echo 44 ;;
+        wlan0:5240) echo 48 ;;
+        *) return 1 ;;
+    esac
+}
+valid_same_pair() {
+    case "$AP:$STA" in wlan1:wlan1-vxd|wlan0:wlan0-vxd) ;; *) return 1 ;; esac
+    printf '%s\n' "$BSSID" | grep -Eq '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' || return 1
+    case "$BSSID" in 00:00:00:00:00:00|ff:ff:ff:ff:ff:ff) return 1 ;; esac
+    FIRST=${BSSID%%:*}
+    [ $((0x$FIRST & 1)) -eq 0 ]
+}
+stop_owned() {
+    [ -n "$1" ] || return 0
+    kill -TERM "$1" 2>/dev/null || :
+    n=0
+    while kill -0 "$1" 2>/dev/null && [ "$n" -lt 10 ]; do
+        sleep 1; n=$((n + 1))
+    done
+    if kill -0 "$1" 2>/dev/null; then
+        kill -KILL "$1" 2>/dev/null || :
+        sleep 1
+    fi
+    # A stuck kernel task is not permission to start a competing radio daemon.
+    kill -0 "$1" 2>/dev/null && return 1
+    wait "$1" 2>/dev/null || :
+}
+start_ap() {
+    hostapd "$APCONF" &
+    APCHILD=$!
+}
+align_ap() {
+    channel=$(frequency_channel "$1") || return 1
+    stop_owned "$APCHILD" || return 1
+    APCHILD=
+    # Regenerate only the private RAM config, never the source template or UCI.
+    awk -v ch="$channel" '
+        /^channel=/ { print "channel=" ch; n++; next }
+        { print }
+        END { if (n != 1) exit 1 }
+    ' /etc/r15/hostapd.conf >"$APCONF.next" || return 1
+    mv "$APCONF.next" "$APCONF" || return 1
+    start_ap
+}
+rejoin_station() {
+    [ "$(wcli disconnect 2>/dev/null)" = OK ] || return 1
+    # Invalidate cached COMPLETED before asking for a new association.
+    status=$(wcli status 2>/dev/null) || return 1
+    printf '%s\n' "$status" | grep -qx 'wpa_state=DISCONNECTED' || return 1
+    [ "$(wcli reassociate 2>/dev/null)" = OK ]
+}
+lease_up() {
+    WWAN=$(ubus -t 2 call network.interface.wwan status 2>/dev/null) || return 1
+    [ "$(printf '%s\n' "$WWAN" | jsonfilter -e '@.up' 2>/dev/null)" = true ] || return 1
+    [ "$(printf '%s\n' "$WWAN" | jsonfilter -e '@.l3_device' 2>/dev/null)" = "$STA" ] || return 1
+    lease=$(printf '%s\n' "$WWAN" | jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null)
+    valid_ipv4 "$lease"
+}
+valid_ipv4() {
+    case "$1" in 0.0.0.0|255.255.255.255) return 1 ;; esac
+    printf '%s\n' "$1" | awk -F. '
+        NF != 4 { exit 1 }
+        { for (i=1;i<=4;i++) if ($i !~ /^[0-9]+$/ || $i > 255) exit 1 }
+        END { if (NR != 1) exit 1 }
+    '
+}
+probe_uplink() {
+    # Probe the learned gateway through the selected netdev, never another uplink.
+    gateway=$(printf '%s\n' "$WWAN" |
+        jsonfilter -e '@.route[@.target="0.0.0.0" && !@.table].nexthop' 2>/dev/null | head -n 1)
+    valid_ipv4 "$gateway" || return 1
+    ip -4 addr show dev "$STA" 2>/dev/null | grep -Fq "inet $lease/" || return 1
+    ping -I "$STA" -c 1 -W 2 "$gateway" >/dev/null 2>&1
+}
+link_down() {
+    READY=0
+    FAILURES=0
+    handle_link disconnected
+}
+publish_state() {
+    # Informational only: this file must never acknowledge or commit a boot bank.
+    printf 'ready=%s\ncontroller_pid=%s\n' "$READY" "$$" >"$APCONF.state.next" &&
+        mv "$APCONF.state.next" "${APCONF%/*}/link-state"
+}
+request_scan() { wcli scan >/dev/null 2>&1 || :; }
+coordinate_tick() {
+    management_up || { link_down; return 0; }
+    read_station
+    read_ap
+    if [ "$STATE" = COMPLETED ] && [ "$SBSSID" = "$BSSID" ] && [ "$CARRIER" = 1 ]; then
+        target=$SFREQ
+    elif scan_frequency; then
+        target=$SCANFREQ
+    else
+        link_down
+        request_scan
+        return 0
+    fi
+    frequency_channel "$target" >/dev/null || {
+        link_down; rlog 'Upstream channel is outside the reviewed radio scope'; return 0;
+    }
+    if [ "$AFREQ" != "$target" ]; then
+        link_down
+        if [ "$PENDING_FREQ" != "$target" ]; then
+            align_ap "$target" || return 1
+            PENDING_FREQ=$target
+            ALIGN_WAIT=0
+            NEED_REJOIN=1
+        else
+            ALIGN_WAIT=$((ALIGN_WAIT + 1))
+            [ "$ALIGN_WAIT" -le 12 ] || return 1
+        fi
+        return 0
+    fi
+    if [ "$APSTATE" != ENABLED ]; then
+        link_down
+        ALIGN_WAIT=$((ALIGN_WAIT + 1))
+        [ "$ALIGN_WAIT" -le 12 ] || return 1
+        return 0
+    fi
+    PENDING_FREQ=
+    ALIGN_WAIT=0
+    if [ "$NEED_REJOIN" = 1 ] || { [ "$STATE" = COMPLETED ] && [ "$CARRIER" != 1 ]; }; then
+        link_down
+        if [ "$REJOIN_WAIT" -gt 0 ]; then
+            REJOIN_WAIT=$((REJOIN_WAIT - 1))
+        elif rejoin_station; then
+            NEED_REJOIN=0
+            REJOIN_WAIT=3
+        fi
+        return 0
+    fi
+    if [ "$STATE" != COMPLETED ] || [ "$SBSSID" != "$BSSID" ] || [ "$CARRIER" != 1 ]; then
+        link_down
+        request_scan
+        return 0
+    fi
+    REJOIN_WAIT=0
+    handle_link connected || return 0
+    # ifup is asynchronous. Do not call it a ready link before DHCP/data checks.
+    READY=0
+    if lease_up; then
+        if probe_uplink; then
+            FAILURES=0; READY=1
+        else
+            FAILURES=$((FAILURES + 1))
+            [ "$FAILURES" -lt 3 ] || link_down
+        fi
+    fi
+}
+coordinator_cleanup() {
+    trap - EXIT INT TERM
+    link_down
+    publish_state || :
+    stop_owned "$STACHILD" || :
+    stop_owned "$APCHILD" || :
+}
+coordinator_main() {
+    AP=$1; STA=$2; BSSID=$(printf '%s' "$3" | tr A-F a-f)
+    ROLE=sta; ATTACHED=0; READY=0; FAILURES=0
+    NEED_REJOIN=0; REJOIN_WAIT=0; ALIGN_WAIT=0; PENDING_FREQ=; APCHILD=; STACHILD=
+    valid_same_pair || { rlog 'Unsupported same-radio configuration'; return 2; }
+    management_up || { rlog 'Wired management is not ready'; return 1; }
+    [ -f /etc/r15/board-startup-verified ] || return 1
+    [ -e "/sys/class/net/$AP" ] && [ -e "/sys/class/net/$STA" ] || return 1
+    [ -r /etc/r15/hostapd.conf ] && [ -r /etc/r15/wpa_supplicant.conf ] || return 1
+    # No adoption or termination of pre-existing radio services is implemented.
+    [ ! -e "/var/run/r15-wpa/$STA" ] && [ ! -e "/var/run/r15-hostapd/$AP" ] || return 1
+    umask 077
+    mkdir -p /var/run/r15-radio || return 1
+    [ ! -L /var/run/r15-radio ] || return 1
+    APCONF=/var/run/r15-radio/hostapd.conf
+    cp /etc/r15/hostapd.conf "$APCONF" || return 1
+    trap coordinator_cleanup EXIT
+    trap 'exit 0' INT TERM
+    publish_state || return 1
+    start_ap
+    wpa_supplicant -Dnl80211 -i "$STA" -c /etc/r15/wpa_supplicant.conf &
+    STACHILD=$!
+    while kill -0 "$STACHILD" 2>/dev/null && kill -0 "$APCHILD" 2>/dev/null; do
+        coordinate_tick || return 1
+        publish_state || return 1
+        sleep 5
+    done
+    return 1
+}
+[ "${R15_SOURCE_ONLY:-0}" = 1 ] || coordinator_main "$@"

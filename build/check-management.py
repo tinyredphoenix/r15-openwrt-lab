@@ -29,6 +29,8 @@ def check(root, output):
     repository = Path(__file__).resolve().parents[1]
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-radio-worker'])
     checks['radio_worker_busybox_syntax'] = 'pass'
+    invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-radio-coordinator'])
+    checks['radio_coordinator_busybox_syntax'] = 'pass'
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-health'])
     checks['health_probe_busybox_syntax'] = 'pass'
     helpers = json.loads((repository / 'build/common-runtime-manifest.json').read_text())
@@ -76,6 +78,20 @@ def check(root, output):
     if parsed.stdout.strip() != 'true':
         raise RuntimeError('Management-status JSON parser did not return true')
     checks['management_status_json'] = 'pass'
+    routes = {'route': [
+        {'target': '0.0.0.0', 'table': 199, 'nexthop': '192.0.2.199'},
+        {'target': '0.0.0.0', 'nexthop': '192.0.2.1'},
+        {'target': '192.0.2.0', 'nexthop': '192.0.2.2'}]}
+    gateway = invoke(root, 'usr/bin/jsonfilter',
+        ['-e', '@.route[@.target="0.0.0.0" && !@.table].nexthop'], input=json.dumps(routes))
+    if gateway.stdout.strip() != '192.0.2.1':
+        raise RuntimeError('Radio gateway selector did not isolate the main default route')
+    checks['radio_gateway_json'] = 'pass; synthetic input only, no route or radio operation'
+    interface = invoke(root, 'usr/bin/jsonfilter', ['-e', '@["ipv4-address"][0].address'],
+        input=json.dumps({'ipv4-address': [{'address': '192.0.2.10', 'mask': 24}]}))
+    if interface.stdout.strip() != '192.0.2.10':
+        raise RuntimeError('Radio IPv4 address selector did not return the learned address')
+    checks['radio_lease_json'] = 'pass; synthetic input only'
     # Keys and temporary config stay outside artifacts and are removed on exit.
     with tempfile.TemporaryDirectory(prefix='r15-userspace-check-') as tmp:
         temporary = Path(tmp)

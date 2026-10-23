@@ -30,4 +30,8 @@ Procd also attempts a cgroup2 mount; the supplied GPL configuration disables cgr
 
 ## Validation boundary
 
-QEMU userspace checks do not execute PID 1, preinit, service startup, mount operations or watchdog code. Required next evidence remains the actual read-only boot arguments, MTD/UBI geometry, interfaces/switch state and per-unit data provenance, followed by independent recovery and wired boot testing. The current software-only scope does not supply that hardware evidence. There is no bootable image or authorized flash step.
+QEMU userspace checks do not execute PID 1, preinit, service startup, mount operations or watchdog code. Actual boot arguments, MTD/UBI geometry, stock interfaces/switch state and private per-unit backups have since been captured. Both radios passed bounded RAM-only repeater tests on the unchanged stock startup. Backup completeness, actual independent restoration and custom wired boot remain open. The new same-radio coordinator addresses channel/carrier policy in offline tests only; see RADIO-COORDINATION.md. There is no bootable image or authorized flash step.
+
+## Channel and lifecycle integration stage
+
+Same-radio review profiles now render one paired controller instead of independently restarting AP and station workers. The controller implements upstream channel alignment, explicit post-AP-restart reassociation, carrier gating, asynchronous DHCP readiness and an interface-bound gateway probe. Cross-radio station workers also gate attachment on carrier. Host logic tests are distinct from target execution; no preinit, inittab, rc.d enablement, board initialization or bank-commit path has been added. Full custom boot remains unqualified.

@@ -76,6 +76,14 @@ esac
         self.assertIn('ifdown wwan', calls)
         self.assertEqual(calls.count('ifup wwan'), 1)
 
+    def test_stale_completed_state_requires_carrier(self):
+        _, stdout = self.run_scenario("""station_carrier() { echo 0; }
+wpa_cli() { echo wpa_state=COMPLETED; }
+station_ready; echo $?
+station_carrier() { echo 1; }; station_ready; echo $?
+wpa_cli() { echo wpa_state=DISCONNECTED; }; station_ready; echo $?""")
+        self.assertEqual(stdout.splitlines(), ['1', '0', '1'])
+
     def test_only_observed_cross_radio_pairs_are_allowed(self):
         _, stdout = self.run_scenario('valid_pair; echo $?; AP=wlan0; valid_pair; echo $?')
         self.assertEqual(stdout.splitlines(), ['0', '1'])

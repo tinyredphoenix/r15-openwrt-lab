@@ -1,0 +1,28 @@
+{
+  "device": "dlink-r15-a1",
+  "country": "IN",
+  "management": {
+    "address": "192.168.77.1/24",
+    "wired_ports": [
+      "eth0.3.0"
+    ],
+    "ssh_authorized_keys": []
+  },
+  "known_upstream_subnets": [],
+  "upstream": {
+    "band": "2g",
+    "interface": "wlan1-vxd",
+    "ssid": "EXAMPLE-TENDA",
+    "key": "EXAMPLE-ONLY-change-before-use",
+    "bssid": "02:11:22:33:44:55"
+  },
+  "downstream": {
+    "band": "2g",
+    "interface": "wlan1",
+    "address": "192.168.78.1/24",
+    "ssid": "EXAMPLE-R15",
+    "key": "EXAMPLE-ONLY-change-before-use",
+    "channel": 1
+  },
+  "evidence": "Review-only same-radio profile. BSSID and credentials are examples. Paired coordinator is offline-tested only; custom boot and AP startup remain unqualified."
+}

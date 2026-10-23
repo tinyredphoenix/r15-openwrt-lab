@@ -128,16 +128,27 @@ def render(profile, stage):
     pending = ["Physical wired-port mapping and switch initialization unverified",
                "Independent bootloader recovery and accepted stock image unverified",
                "Watchdog handoff and boot-success confirmation requirements unverified",
-               "Per-unit flash/config/calibration backups not collected",
+               "Complete recoverable per-unit flash/calibration preservation not qualified",
                "RAM-only kernel/Ethernet/SSH boot test not performed",
-               "Runtime boot arguments, flash map and update handler unverified"]
+               "Actual custom boot and safe update handling unverified"]
     if not profile["management"].get("ssh_authorized_keys"):
         pending.append("No owner SSH public key configured: SSH login would be unavailable")
     if stage == "repeater":
         upstream, downstream = profile["upstream"], profile["downstream"]
-        if {upstream["band"], downstream["band"]} != {"2g", "5g"}:
-            raise ValueError("Only cross-radio operation is implemented; same-radio concurrency is untested")
+        if upstream["band"] not in ("2g", "5g") or downstream["band"] not in ("2g", "5g"):
+            raise ValueError("Unknown radio band")
+        same_radio = upstream["band"] == downstream["band"]
         uplink, ap = interface(upstream["interface"]), interface(downstream["interface"])
+        selected_bssid = upstream.get("bssid", "")
+        if same_radio:
+            expected = ("wlan1", "wlan1-vxd") if upstream["band"] == "2g" else ("wlan0", "wlan0-vxd")
+            if (ap, uplink) != expected:
+                raise ValueError("Same-radio mode requires the observed AP/VXD interface pair")
+            if not isinstance(selected_bssid, str) or not re.fullmatch(r"(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}", selected_bssid):
+                raise ValueError("Same-radio mode requires a selected upstream BSSID")
+            selected_bssid = selected_bssid.lower()
+            if int(selected_bssid[:2], 16) & 1 or selected_bssid == "00:00:00:00:00:00":
+                raise ValueError("Select a nonzero unicast upstream BSSID")
         if len({uplink, ap, *reserved}) != len(reserved) + 2 or any(
             name in ("lo", "br-mgmt", "br-lan") for name in (uplink, ap)
         ):
@@ -158,6 +169,9 @@ def render(profile, stage):
             "ctrl_interface=/var/run/r15-wpa\ncountry=IN\nap_scan=1\nnetwork={\n"
             "\tssid=%s\n\tscan_ssid=1\n\tproto=RSN\n\tkey_mgmt=WPA-PSK\n"
             "\tpairwise=CCMP\n\tgroup=CCMP\n\tpsk=%s\n}\n" % (ssid(upstream["ssid"]).hex(), sta_key))
+        if same_radio:
+            files["radio-config/wpa_supplicant.conf"] = files["radio-config/wpa_supplicant.conf"].replace(
+                "network={\n", "network={\n\tbssid=" + selected_bssid + "\n", 1)
         files["radio-config/hostapd.conf"] = (
             "driver=nl80211\ninterface=%s\nbridge=br-lan\nctrl_interface=/var/run/r15-hostapd\n"
             "ssid2=%s\ncountry_code=IN\nieee80211d=1\nhw_mode=%s\nchannel=%d\n"
@@ -179,6 +193,16 @@ def render(profile, stage):
             "    procd_set_param respawn 3600 5 5\n"
             "    procd_set_param stdout 1\n    procd_set_param stderr 1\n"
             "    procd_close_instance\n}\n" % (ap, uplink, ap, uplink))
+        if same_radio:
+            files["runtime/r15-radio-coordinator"] = (
+                Path(__file__).parent / "runtime/r15-radio-coordinator").read_text()
+            files["runtime/r15-radio.init"] = (
+                "#!/bin/sh /etc/rc.common\nUSE_PROCD=1\nSTART=80\nSTOP=10\n"
+                "start_service() {\n    procd_open_instance paired\n"
+                "    procd_set_param command /usr/libexec/r15-radio-coordinator %s %s %s\n"
+                "    procd_set_param respawn 3600 5 5\n"
+                "    procd_set_param stdout 1\n    procd_set_param stderr 1\n"
+                "    procd_close_instance\n}\n" % (ap, uplink, selected_bssid))
         # No static ifname: vendor Wi-Fi must be attached as an external device
         # by a future board-specific backend, rather than recreated by netifd.
         files["openwrt-config/network"] += uci("lan", "interface", [("type", "bridge"),
@@ -200,10 +224,14 @@ def render(profile, stage):
             ("start", "100"), ("limit", "50"), ("leasetime", "12h")])
         files["openwrt-config/dhcp"] += uci("wwan", "dhcp", [("interface", "wwan"), ("ignore", "1")])
         pending += ["Radio-to-netdev mapping, RF tables and per-unit MAC initialization unverified",
-                    "R15 hostapd association-response integration not built/tested",
+                    "Custom hostapd AP startup on the R15 not qualified; prior runtime AP tests retained OEM hostapd",
                     "Radio worker and external-device reconnect implemented; target execution and procd integration untested",
                     "Board driver/MAC/RF initialization and board-startup-verified prerequisite not implemented",
                     "Runtime upstream-subnet conflict check not implemented"]
+        if same_radio:
+            pending += ["Same-radio coordinator has offline tests only; target execution and custom AP startup are unqualified",
+                        "Selected-BSSID policy does not implement roaming or DFS/high-band channel coordination",
+                        "Gateway ICMP health policy requires validation; no Internet or production readiness is inferred"]
     laptop = management.network.network_address + (2 if (int(management.ip) & 255) != 2 else 3)
     files["REVIEW-ONLY.txt"] = (
         "NOT FIRMWARE. NOT AN INSTALLABLE OVERLAY. DO NOT COPY TO A ROUTER.\n"

@@ -88,6 +88,40 @@ class RepeaterTests(unittest.TestCase):
         self.assertEqual(psk("IEEE", "password"),
                          "f42c6fc52df0ebef9ebb4b90b38a5f902e83fe1b135a70e23aed762e9710a12e")
 
+    def test_same_radio_uses_one_coordinator_and_pins_selected_bssid(self):
+        profile = json.loads((ROOT / 'profile.same-radio.example.json').read_text())
+        for band, ap, sta, channel in [('2g', 'wlan1', 'wlan1-vxd', 1),
+                                       ('5g', 'wlan0', 'wlan0-vxd', 40)]:
+            with self.subTest(band=band):
+                profile['upstream'].update(band=band, interface=sta)
+                profile['downstream'].update(band=band, interface=ap, channel=channel)
+                files, manifest = render(profile, 'repeater')
+                init = files['runtime/r15-radio.init']
+                self.assertEqual(init.count('procd_open_instance'), 1)
+                self.assertIn('r15-radio-coordinator ' + ap + ' ' + sta, init)
+                self.assertNotIn('r15-radio-worker ap', init)
+                self.assertIn('bssid=02:11:22:33:44:55', files['radio-config/wpa_supplicant.conf'])
+                self.assertIn('runtime/r15-radio-coordinator', files)
+                self.assertFalse(manifest['flashable'])
+                self.assertFalse(manifest['installable_overlay'])
+
+    def test_same_radio_requires_reviewed_pair_and_unicast_bssid(self):
+        base = json.loads((ROOT / 'profile.same-radio.example.json').read_text())
+        for bad in ['', '03:11:22:33:44:55', '00:00:00:00:00:00',
+                    '02:11:22:33:44:55;reboot', '02:11:22:33:44:55\n']:
+            profile = copy.deepcopy(base)
+            profile['upstream']['bssid'] = bad
+            with self.subTest(bssid=bad), self.assertRaises(ValueError):
+                render(profile, 'repeater')
+        base['upstream']['interface'] = 'wlan0-vxd'
+        with self.assertRaisesRegex(ValueError, 'observed'):
+            render(base, 'repeater')
+
+    def test_wired_first_does_not_enable_same_radio_controller(self):
+        profile = json.loads((ROOT / 'profile.same-radio.example.json').read_text())
+        files, _ = render(profile, 'wired-first')
+        self.assertFalse(any(name.startswith(('runtime/', 'radio-config/')) for name in files))
+
     def test_ssid_directive_injection_is_encoded_as_data(self):
         name = 'quote"\ninterface=br-mgmt'
         self.profile["downstream"]["ssid"] = name

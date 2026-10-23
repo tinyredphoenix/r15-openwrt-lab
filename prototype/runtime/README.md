@@ -1,31 +1,31 @@
-# R15 radio worker — research component
+# R15 radio lifecycle components
 
-`r15-radio-worker` implements the process and uplink lifecycle for a future OpenWrt userspace build. It is not a stock-firmware installer. The renderer includes this worker and a procd service in repeater review bundles; `wired-first` has neither.
+These are research inputs for a future retained-kernel OpenWrt userspace build. They are not installers or a complete boot framework. No component initializes the board, writes firmware or creates the board-startup verification prerequisite.
 
-Two independent procd instances run the downstream hostapd process and the upstream supplicant worker. Their failures are restarted with bounded retries. No `iw interface add`, global process kill, network restart, switch write, module loading or flash command is used.
+## Independent wired management
 
-The upstream worker waits for `wpa_state=COMPLETED`, attaches the existing VXD device with netifd's `add_device`, and starts only `wwan`. On disconnect it stops only `wwan` and detaches that device. The supplicant remains running to reconnect; re-association attaches the interface again. Failed attachment or DHCP startup is retried on later polls. Repeated successful status polls do not continually restart DHCP. The AP process is separate from this uplink state machine.
+Before starting radios, the future platform startup must initialize and validate the reserved wired management interface, firewall, DHCP and authenticated admin access. A marker file is only an explicit missing prerequisite; touching it does not qualify board startup. `wired-first` rendering includes no radio service.
 
-Only the observed cross-radio pairs are accepted:
+## Cross-radio worker
 
-| Upstream | Downstream |
+`r15-radio-worker` supervises one AP or station process. For station mode it now requires both COMPLETED and carrier before handing the existing VXD to netifd. Disconnect removes only `wwan`; management and AP are not restarted. The two cross-radio instances remain separate.
+
+## Same-radio coordinator
+
+`r15-radio-coordinator` owns both foreground children in a single procd instance. It selects the upstream frequency from an associated station with carrier or a fresh matching selected-BSSID scan result. On mismatch it detaches the uplink, regenerates a private RAM AP configuration, restarts only its AP child, waits for channel alignment, invalidates stale station state and requests reassociation. DHCP waits for association, carrier and AP alignment; readiness additionally waits for netifd and an interface-bound gateway probe.
+
+This implements offline-tested policy for the actual AP-channel/carrier failure observed during stock-kernel tests. It has not run against the target drivers or netifd/procd. It cannot be called a completed boot integration. See [policy, limits and remaining gates](../../requirements/RADIO-COORDINATION.md).
+
+| Input | Future location |
 |---|---|
-| `wlan0-vxd` (5 GHz) | `wlan1` (2.4 GHz) |
-| `wlan1-vxd` (2.4 GHz) | `wlan0` (5 GHz) |
-
-Before starting, the worker requires an existing `mgmt` interface reporting up, both board-created radio netdevs, and `/etc/r15/board-startup-verified`. **No code here creates that marker.** It represents a missing board bring-up and validation step; creating an empty file is not a substitute for testing switch/MAC/calibration initialization. The worker does not configure management or claim to verify SSH access.
-
-Future packaging locations (not implemented):
-
-| Review input | Target path |
-|---|---|
-| `runtime/r15-radio-worker` | `/usr/libexec/r15-radio-worker` (executable) |
-| `runtime/r15-radio.init` | `/etc/init.d/r15-radio` (executable) |
-| `radio-config/hostapd.conf` | `/etc/r15/hostapd.conf` (private) |
+| `runtime/r15-radio-worker` | `/usr/libexec/r15-radio-worker` |
+| `runtime/r15-radio-coordinator` | `/usr/libexec/r15-radio-coordinator` |
+| `runtime/r15-radio.init` | `/etc/init.d/r15-radio` |
+| `radio-config/hostapd.conf` | `/etc/r15/hostapd.conf` (private template) |
 | `radio-config/wpa_supplicant.conf` | `/etc/r15/wpa_supplicant.conf` (private) |
 
-The generated UCI `lan` bridge must already be available for hostapd. The 2.4 GHz AP requires the association-response driver integration identified in the driver audit. Module ordering, per-unit RF/MAC data, ABI compatibility, watchdog boot acknowledgement, live DHCP subnet collision rejection and update/recovery remain unresolved. Dynamic command behavior is tested against mocks only; actual OpenWrt/netifd/procd and R15 driver behavior are untested.
+Review bundles deliberately store scripts as non-executable inputs. They do not enable `/etc/rc.d` entries or write marker files. The future renderer/service packaging must preserve that boundary until board startup, custom AP execution and secure management have been qualified.
 
-`profile.stock-observed.example.json` uses interface names seen in the owner log. Its management device is a candidate based on that log, not a validated replacement-kernel physical port map. Credentials remain example values and it has no owner SSH key.
+`profile.same-radio.example.json` contains example credentials and a synthetic BSSID, never owner data. The selection is pinned and initial channel support is bounded; it does not imply arbitrary roaming or DFS support.
 
-Tests: `python3 -m unittest discover -s prototype -v` — 18 passing tests including reconnect, attachment/DHCP failure, absent uplink and management loss. The tests run fake commands in a temporary directory and never contact the router.
+Tests run fake shell adapters and never contact the router. Target BusyBox/jsonfilter checks are separately defined in the Linux build; host tests do not execute them.

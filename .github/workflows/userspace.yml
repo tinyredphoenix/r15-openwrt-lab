@@ -21,6 +21,7 @@ jobs:
           python3 -m unittest discover -s prototype -v
           python3 -m unittest discover -s tests -v
           sh -n prototype/runtime/r15-radio-worker
+          sh -n prototype/runtime/r15-radio-coordinator
           bash -n build/build-userspace.sh
       - name: Build dependencies
         run: |
