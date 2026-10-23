@@ -39,7 +39,8 @@ def stage(source, root):
     for target, data, _ in prepared:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
-        target.chmod(0o755 if target.relative_to(root).as_posix() in ('etc/rc.common', 'sbin/hotplug-call') else 0o644)
+        target.chmod(0o755 if target.relative_to(root).as_posix() in
+                     ('etc/rc.common', 'sbin/hotplug-call', 'bin/ipcalc.sh') else 0o644)
     return {'commit': manifest['commit'], 'files': [record for _, _, record in prepared],
             'hotplug_path': RUNTIME_PATH, 'boot_framework_complete': False}
 

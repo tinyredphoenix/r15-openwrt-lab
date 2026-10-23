@@ -25,6 +25,11 @@
       "path": "sbin/hotplug-call",
       "sha256": "4cdc5b9683d615abd0be579fccbd3b8720b0bd57346e5fe45cea7a7a377845ff",
       "bytes": 336
+    },
+    {
+      "path": "bin/ipcalc.sh",
+      "sha256": "0e170cfb8015c2c589c58f835224aa3f6bb33e8a12eb07888e304ba27f54f548",
+      "bytes": 1550
     }
   ]
 }

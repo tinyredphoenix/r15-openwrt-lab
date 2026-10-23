@@ -12,6 +12,8 @@ Package `Require-User` fields specify identities for ubus, dnsmasq, logd, networ
 
 Before enabling services, establish writable runtime directories and account ownership, host-key generation, owner SSH authorization, and R15 Ethernet initialization. Verify the labelled management socket with both radios unavailable. Do not enable generic wireless startup as part of a management-only test.
 
+The DHCP client and dnsmasq startup also require `/bin/ipcalc.sh`, which comes from base-files rather than their IPKs. This helper is now staged from the pinned source. Target BusyBox checks exercise its embedded AWK against dotted netmasks, CIDR input and the management DHCP range; no DHCP process is started.
+
 ## Filesystem assumptions
 
 The supplied GPL kernel configuration disables `CONFIG_OVERLAY_FS` and `CONFIG_BLK_DEV_INITRD`; UBIFS, SquashFS and tmpfs are enabled. An embedded IKCONFIG marker was not found in the extracted stock kernel, so the source configuration cannot be promoted to an exact binary configuration.

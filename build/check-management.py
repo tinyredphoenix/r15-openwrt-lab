@@ -35,6 +35,23 @@ def check(root, output):
     for record in helpers['files']:
         invoke(root, 'bin/busybox', ['ash', '-n', root / record['path']])
     checks['common_service_helper_busybox_syntax'] = [r['path'] for r in helpers['files']]
+    # Execute only the helper's embedded AWK with the target BusyBox. Running
+    # the shell wrapper under QEMU could dispatch the host's awk via PATH.
+    ipcalc = (root / 'bin/ipcalc.sh').read_text()
+    prefix, suffix = 'awk -f - $* <<EOF\n', '\nEOF\n'
+    if ipcalc.count(prefix) != 1 or not ipcalc.endswith(suffix):
+        raise RuntimeError('Unexpected pinned ipcalc wrapper')
+    awk = ipcalc.split(prefix, 1)[1][:-len(suffix)] + '\n'
+    calculations = [(['192.168.77.1', '255.255.255.0'],
+                     {'NETWORK': '192.168.77.0', 'BROADCAST': '192.168.77.255', 'PREFIX': '24'}),
+                    (['10.20.30.40/16'], {'NETWORK': '10.20.0.0', 'NETMASK': '255.255.0.0', 'PREFIX': '16'}),
+                    (['192.168.77.1', '24', '100', '49'], {'START': '192.168.77.100', 'END': '192.168.77.149'})]
+    for args, expected in calculations:
+        result = invoke(root, 'bin/busybox', ['awk', '-f', '-', *args], input=awk)
+        actual = dict(line.split('=', 1) for line in result.stdout.splitlines())
+        if any(actual.get(key) != value for key, value in expected.items()):
+            raise RuntimeError('Target ipcalc arithmetic failed: ' + result.stdout)
+    checks['ipcalc_target_awk'] = 'pass; dotted mask, CIDR and management DHCP range'
     # Source-verified -h exits before fw3 builds state, connects to ubus or
     # touches netfilter. Never call start/stop/flush/print under user emulation.
     firewall = invoke(root, 'sbin/fw3', ['-h'], accepted=(1,))

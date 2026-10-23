@@ -39,7 +39,7 @@ For a small local download, run **Actions → Export compact research runtime** 
 
 ## What still blocks firmware
 
-The runtime includes five hash-pinned generic OpenWrt shell helpers used by init scripts and hotplug, with BusyBox syntax checks. These provide service plumbing only. Boot entrypoints, filesystem mounts and R15 switch initialization remain unimplemented; SDK board base-files, generic wireless startup and firmware upgraders are excluded.
+The runtime includes six hash-pinned generic OpenWrt shell helpers used by init scripts and hotplug, with BusyBox syntax checks. These provide service plumbing only. Boot entrypoints, filesystem mounts and R15 switch initialization remain unimplemented; SDK board base-files, generic wireless startup and firmware upgraders are excluded.
 
 The [boot integration audit](requirements/BOOT-INTEGRATION.md) records the actual procd entrypoints, missing service enablement, generated package service accounts, and vendor-kernel overlay/watchdog differences. Service-account password fields are locked; owner SSH access still requires provisioning and testing.
 
