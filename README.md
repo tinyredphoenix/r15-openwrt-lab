@@ -61,3 +61,5 @@ Original project glue is MIT licensed; imported hostapd patch retains BSD-3-Clau
 ## Radio integration status
 
 Private owner-authorized tests separately qualified bounded 5 GHz and 2.4 GHz routed repeating on the stock kernel/vendor drivers, using compiled station and DHCP/DNS tools with OEM AP services. An AP restart exposed a channel-selection/carrier failure, corrected manually in that experiment. The [same-radio coordinator](requirements/RADIO-COORDINATION.md) now models that recovery in code and renders a single-owner service. No private credentials, router captures or calibration data are included here. Full custom boot and target execution of the coordinator remain untested.
+
+Final management direction: [OpenWrt administration](requirements/OPENWRT-MANAGEMENT.md) replaces the OEM interface. LuCI/RPC/HTTPS and optional PPPoE are being added to the cached build; radio UI integration and actual target startup remain unqualified. No private administrative credentials are published.

@@ -41,6 +41,7 @@ jobs:
           restore-keys: |
             r15-sdk-ubuntu24-v2-${{ hashFiles('build/pins.env') }}-
             r15-sdk-ubuntu22-v1-${{ hashFiles('build/pins.env') }}-
+            r15-sdk-ubuntu24-v2-
       - name: Compile and emulate userspace tools
         run: bash build/build-userspace.sh
       - name: Save SDK and dependency work even after a later failure

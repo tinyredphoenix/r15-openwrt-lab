@@ -120,6 +120,17 @@ def management_files(profile):
         "openwrt-config/firewall": firewall,
         "openwrt-config/dhcp": dhcp,
         "openwrt-config/dropbear": dropbear,
+        "openwrt-config/uhttpd": uci("management", "uhttpd", [
+            ("redirect_https", "1"), ("home", "/www"), ("cgi_prefix", "/cgi-bin"),
+            ("ubus_prefix", "/ubus"), ("cert", "/etc/uhttpd.crt"),
+            ("key", "/etc/uhttpd.key"), ("no_dirlists", "1"),
+            ("script_timeout", "60"), ("network_timeout", "30")]) +
+            "\tlist listen_http '" + str(address.ip) + ":80'\n" +
+            "\tlist listen_https '" + str(address.ip) + ":443'\n",
+        "openwrt-config/rpcd": uci("rpcd", "rpcd", [
+            ("socket", "/var/run/ubus/ubus.sock"), ("timeout", "30")]) +
+            uci("root", "login", [("username", "root"), ("password", "$p$root")]) +
+            "\tlist read '*'\n\tlist write '*'\n",
         "openwrt-config/wireless": "# No netifd-managed radios in this prototype.\n",
         "dropbear/authorized_keys": "\n".join(keys) + ("\n" if keys else ""),
     }, address, ports
@@ -137,6 +148,7 @@ def render(profile, stage):
                "Complete recoverable per-unit flash/calibration preservation not qualified",
                "RAM-only kernel/Ethernet/SSH boot test not performed",
                "Actual custom boot and safe update handling unverified"]
+    pending.append("LuCI root password, HTTPS identity and actual web/RPC service startup not provisioned or qualified")
     if not profile["management"].get("ssh_authorized_keys"):
         pending.append("No owner SSH public key configured: SSH login would be unavailable")
     if stage == "repeater":

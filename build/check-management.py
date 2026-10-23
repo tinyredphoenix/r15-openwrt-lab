@@ -187,12 +187,12 @@ echo "ready:$READY"
         config = temporary / 'config'
         state = temporary / 'state'
         config.mkdir(); state.mkdir()
-        for name in ('network', 'dhcp', 'dropbear', 'firewall'):
+        for name in ('network', 'dhcp', 'dropbear', 'firewall', 'uhttpd', 'rpcd'):
             (config / name).write_text(rendered['openwrt-config/' + name])
             result = invoke(root, 'sbin/uci', ['-c', config, '-P', state, 'export', name])
             if 'package ' + name not in result.stdout:
                 raise RuntimeError('UCI failed to export ' + name)
-        checks['renderer_uci_parsing'] = ['network', 'dhcp', 'dropbear', 'firewall']
+        checks['renderer_uci_parsing'] = ['network', 'dhcp', 'dropbear', 'firewall', 'uhttpd', 'rpcd']
         dns_config = temporary / 'dnsmasq.conf'
         dns_config.write_text('port=0\ninterface=br-mgmt\nbind-dynamic\n'
                               'dhcp-range=192.168.77.100,192.168.77.149,255.255.255.0,1h\n'
@@ -204,6 +204,15 @@ echo "ready:$READY"
         if 'bad option' not in bad.stderr.lower():
             raise RuntimeError('Invalid-config negative control did not report a bad option')
         checks['management_dhcp_syntax'] = 'pass, including no-default-route/DNS options and invalid-config rejection'
+    luci_files = sorted((root / 'usr/lib/lua/luci').rglob('*.lua'))
+    if not luci_files or not (root / 'www/cgi-bin/luci').is_file():
+        raise RuntimeError('LuCI dispatcher/assets were not collected')
+    # Parse without executing controller code, loading modules or serving HTTP.
+    lua = invoke(root, 'usr/bin/lua', ['-', *luci_files],
+                 input='for i=1,#arg do assert(loadfile(arg[i])) end\nprint("syntax-only")\n')
+    if lua.stdout.strip() != 'syntax-only':
+        raise RuntimeError('Unexpected Lua syntax-check result')
+    checks['luci_target_lua_syntax'] = {'files': len(luci_files), 'executed_controllers': False}
     checks['scope'] = 'Userspace execution only: no SSH listener, DHCP daemon, init, mounts, or network changes'
     checks['kernel_and_hardware_tested'] = False
     (output / 'management-checks.json').write_text(json.dumps(checks, indent=2) + '\n')

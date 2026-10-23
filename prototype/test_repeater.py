@@ -29,6 +29,16 @@ class RepeaterTests(unittest.TestCase):
         wired, _ = render(self.profile, "wired-first")
         self.assertNotIn("runtime/r15-subnet-check", wired)
 
+    def test_web_and_rpc_config_are_management_scoped_with_no_radio_dependency(self):
+        files, manifest = render(self.profile, "wired-first")
+        http = files['openwrt-config/uhttpd']
+        self.assertIn("list listen_http '192.168.77.1:80'", http)
+        self.assertIn("list listen_https '192.168.77.1:443'", http)
+        self.assertNotIn('0.0.0.0', http)
+        self.assertIn("option redirect_https '1'", http)
+        self.assertIn("option password '$p$root'", files['openwrt-config/rpcd'])
+        self.assertTrue(any('LuCI root password' in x for x in manifest['blockers']))
+
     def test_management_survives_missing_or_broken_radio_configuration(self):
         wired, _ = render(self.profile, "wired-first")
         broken = copy.deepcopy(self.profile)

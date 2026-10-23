@@ -36,6 +36,17 @@ if ! cmp -s "$ROOT/patches/900-rtl8192cd-sta-assoc-reply.patch" "$PATCH_TARGET";
     cp "$ROOT/patches/900-rtl8192cd-sta-assoc-reply.patch" "$PATCH_TARGET"
     PATCH_CHANGED=1
 fi
+# Pin LuCI separately; src-link keeps feeds metadata local after checkout.
+LUCI_SOURCE="$CACHE/luci-$LUCI_COMMIT"
+if [[ ! -d "$LUCI_SOURCE/.git" ]]; then
+    git init -q "$LUCI_SOURCE"
+    git -C "$LUCI_SOURCE" remote add origin https://github.com/openwrt/luci.git
+    git -C "$LUCI_SOURCE" fetch -q --depth 1 origin "$LUCI_COMMIT"
+    git -C "$LUCI_SOURCE" checkout -q --detach FETCH_HEAD
+fi
+[[ $(git -C "$LUCI_SOURCE" rev-parse HEAD) == "$LUCI_COMMIT" ]]
+printf 'src-link luci %s\n' "$LUCI_SOURCE" > "$SDK/feeds.conf"
+(cd "$SDK" && ./scripts/feeds update luci && ./scripts/feeds install -a -p luci)
 cp "$ROOT/build/userspace.config" "$SDK/.config"
 make -C "$SDK" defconfig
 for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
@@ -44,7 +55,9 @@ for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
     CONFIG_PACKAGE_busybox=y CONFIG_PACKAGE_procd=y CONFIG_PACKAGE_netifd=y \
     CONFIG_PACKAGE_uci=y CONFIG_PACKAGE_dropbear=y CONFIG_PACKAGE_dnsmasq=y \
     CONFIG_PACKAGE_jsonfilter=y CONFIG_DROPBEAR_ED25519=y \
-    CONFIG_PACKAGE_firewall=y CONFIG_PACKAGE_iptables=y CONFIG_PACKAGE_ip6tables=y; do
+    CONFIG_PACKAGE_firewall=y CONFIG_PACKAGE_iptables=y CONFIG_PACKAGE_ip6tables=y \
+    CONFIG_PACKAGE_luci=y CONFIG_PACKAGE_ppp=y CONFIG_PACKAGE_ppp-mod-pppoe=y \
+    CONFIG_PACKAGE_uhttpd=y CONFIG_PACKAGE_rpcd=y CONFIG_PACKAGE_libustream-openssl=y; do
     grep -qx "$symbol" "$SDK/.config" || { echo "Missing build setting: $symbol" >&2; exit 1; }
 done
 # Invalidate wpad only when the added patch changes. OpenWrt tracks configuration
@@ -56,10 +69,14 @@ make -C "$SDK" package/toolchain/compile -j2 V=s
 make -C "$SDK" package/network/services/hostapd/compile -j2 V=s
 for package in utils/busybox system/procd system/ubox system/ubus system/uci \
     network/config/netifd network/services/dropbear network/services/dnsmasq \
-    utils/jsonfilter network/utils/iptables network/config/firewall; do
+    utils/jsonfilter network/utils/iptables network/config/firewall \
+    network/services/ppp network/services/uhttpd system/rpcd; do
     make -C "$SDK" "package/$package/compile" -j2 V=s
 done
+make -C "$SDK" package/feeds/luci/luci/compile -j2 V=s
 python3 "$ROOT/build/collect-userspace.py" "$SDK" "$ROOT/artifacts"
+git -C "$LUCI_SOURCE" archive --format=tar.gz --prefix=luci/ "$LUCI_COMMIT" \
+    > "$ROOT/artifacts/sources/luci-pinned-source.tar.gz"
 python3 "$ROOT/build/stage-dhcp-guard.py" "$ROOT/artifacts/rootfs" "$ROOT/artifacts/dhcp-guard-staging.json"
 python3 "$ROOT/build/stage-common-runtime.py" "$SOURCE/package/base-files/files" \
     "$ROOT/artifacts/rootfs" "$ROOT/artifacts/common-runtime.json"
