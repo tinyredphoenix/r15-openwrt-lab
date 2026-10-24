@@ -45,3 +45,19 @@ The controller still requires the independently established board-startup marker
 existing interfaces and wired management; the launcher cannot create that marker.
 It neither adopts nor kills stock services. The actual integrated device run is
 pending. Cross-radio profiles retain their earlier direct worker template.
+
+## Stock-assisted boot integration
+
+`r15-stock-management` adds key-only SSH and pinned HTTPS after OEM board startup,
+maintaining the reserved wired address and its route. An explicitly enabled private
+radio UCI profile can dispatch `r15-network-handoff`. The handoff uses the existing
+ubus and a separate process ledger, preserves external ownership of wired bridges,
+and scopes cleanup to network services and its own mounts. It must never call the
+broad chroot cleanup while management is running. Automatic handoff startup is a
+new private-image experiment; manually dispatched coexistence has passed on the
+first flashed management image.
+
+`r15-stage-inactive` is a narrow, explicitly invoked experimental bank writer, not
+a web updater. Trial environment guards prevent known stock auto-commit paths; an
+operator-only copy of the stock environment tool is retained for deliberate bank
+selection. No source-only helper qualifies recovery or a release by itself.

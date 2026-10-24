@@ -1,6 +1,6 @@
 # D-Link R15 A1 OpenWrt research
 
-Work toward a minimal routed wireless repeater for the Indian R15 A1, with wired management independent of the Wi-Fi uplink. **No bootable or flashable R15 firmware is available here. Do not upload these artifacts to a router.**
+Work toward a minimal routed wireless repeater for the Indian R15 A1, with wired management independent of the Wi-Fi uplink. **This public repository contains research source, not a downloadable installation image. A private, unit-specific stock-assisted image has booted on the owner’s R15.**
 
 Observed stock firmware 1.06.10 uses RTL8198D, big-endian MIPS interAptiv, Linux 4.4.140; RTL8852AE (`wlan0`, PCI 10ec:8852) and RTL8192FE (`wlan1`, PCI 10ec:818c). Both create VXD client interfaces. The running stock kernel reports 256 MiB physical RAM (about 238.8 MiB MemTotal). These observations do not establish OpenWrt driver compatibility.
 
@@ -37,17 +37,41 @@ The SDK download is about 82 MiB; expanded compiler, dependencies and sources ne
 
 For a small local download, run **Actions → Export compact research runtime** with a successful userspace run ID. It verifies the selected files against that run's checksum manifest on the cloud runner and exports only runtime packages, the userspace tarball and reports. Large source archives remain in the original build artifact; provenance links to that run. The compact output is also non-flashable.
 
-## What still blocks firmware
+## Boot integration and remaining release work
 
-The runtime includes six hash-pinned generic OpenWrt shell helpers used by init scripts and hotplug, with BusyBox syntax checks. These provide service plumbing only. Boot entrypoints, filesystem mounts and R15 switch initialization remain unimplemented; SDK board base-files, generic wireless startup and firmware upgraders are excluded.
+A private guarded bank1 image has booted from NAND using the exact OEM kernel,
+drivers, PID1 and board initialization, with OpenWrt management under
+`/opt/r15-openwrt`. Key-only SSH authenticated as root and certificate-pinned HTTPS
+responded. Late OEM startup removed the management subnet route while keeping its
+address; explicitly restoring that route fixed access. The bootstrap source now
+maintains both the address and return route.
 
-The [boot integration audit](requirements/BOOT-INTEGRATION.md) records the actual procd entrypoints, missing service enablement, generated package service accounts, and vendor-kernel overlay/watchdog differences. Service-account password fields are locked; owner SSH access still requires provisioning and testing.
+The original bank0 remains committed. Trial selection reset to its inactive
+sentinel during boot; the default environment writer and known boot-acknowledgement
+script are guarded against automatic commitment. The original environment tool is
+preserved at an explicit operator path. These guards cover known vendor paths,
+not every possible vendor write. The narrow inactive-bank writer validates identity,
+current bank, volume geometry, existing contents, image hashes and readback; it does
+not select a bank, reboot, format UBI, or write raw NAND.
 
-The [recovery and hardware acceptance requirements](requirements/RECOVERY-AND-HARDWARE.md) track wired failsafe, independent restoration to stock, safe firmware updates, power/watchdog behavior, LEDs, Ethernet, radio RX/TX, scanning, broadcasting and Wi-Fi security. These are pre-flash requirements, not completed hardware tests.
+A scoped network handoff has run alongside the flashed management services:
+5 GHz association, DHCP, initial automatic channel alignment and interface-bound
+Internet probes passed while SSH and HTTPS remained reachable. Its shutdown
+restored stock services without stopping management. Earlier independent 5 GHz and
+2.4 GHz phone tests retain their qualification; this integration does not repeat or
+replace their load/reconnect evidence. The next private image adds automatic network
+startup; that new startup path still requires its own first boot.
 
-The [stock boot-mechanism findings](requirements/STOCK-BOOT-MECHANISM.md) document paired logical kernel/rootfs sections, `sw_tryactive`/`sw_commit`, and the inner-record integrity checker. Bootloader rollback and the live flash layout remain unverified.
+Remaining release work includes persistent owner settings/apply, automatic startup
+qualification, live upstream channel changes, stability, a tested stock restoration
+upload and a distributable installer/update path. No mainline kernel, Wi-Fi 6 AP,
+full OpenWrt PID1 takeover or complete recovery guarantee is claimed. Private image,
+credential, calibration, backup and device-log artifacts stay outside this repository.
 
-R15 board initialization and per-unit MAC/calibration handling; complete runtime flash/UBI map; kernel/driver/userspace compatibility; watchdog boot acknowledgement; actual wired management boot testing; owner SSH provisioning; and independently verified bootloader recovery. D-Link's GPL README provides a recovery-entry recipe, but restoration on the actual unit has not been demonstrated. No firmware write is implemented by this project.
+The [boot integration audit](requirements/BOOT-INTEGRATION.md),
+[recovery requirements](requirements/RECOVERY-AND-HARDWARE.md) and
+[stock boot mechanisms](requirements/STOCK-BOOT-MECHANISM.md) retain the detailed
+research history; the current status here supersedes their older pending labels.
 
 ## References and licensing
 
@@ -60,7 +84,7 @@ Original project glue is MIT licensed; imported hostapd patch retains BSD-3-Clau
 
 ## Radio integration status
 
-Private owner-authorized tests separately qualified bounded 5 GHz and 2.4 GHz routed repeating on the stock kernel/vendor drivers, using compiled station and DHCP/DNS tools with OEM AP services. An AP restart exposed a channel-selection/carrier failure, corrected manually in that experiment. The [same-radio coordinator](requirements/RADIO-COORDINATION.md) now models that recovery in code and renders a single-owner service. No private credentials, router captures or calibration data are included here. The production coordinator has since passed bounded 5 GHz RAM execution with our AP and station daemons, UCI rendering, initial automatic channel alignment, netifd DHCP and radio-bound Internet traffic. A phone received DHCP/DNS and forwarded Internet traffic through our AP and compiled iptables rules. Full custom boot remains untested.
+Private owner-authorized tests separately qualified bounded 5 GHz and 2.4 GHz routed repeating on the stock kernel/vendor drivers, using compiled station and DHCP/DNS tools with OEM AP services. An AP restart exposed a channel-selection/carrier failure, corrected manually in that experiment. The [same-radio coordinator](requirements/RADIO-COORDINATION.md) now models that recovery in code and renders a single-owner service. No private credentials, router captures or calibration data are included here. The production coordinator has since passed bounded 5 GHz RAM execution with our AP and station daemons, UCI rendering, initial automatic channel alignment, netifd DHCP and radio-bound Internet traffic. A phone received DHCP/DNS and forwarded Internet traffic through our AP and compiled iptables rules. The stock-assisted management filesystem has since booted; full OpenWrt PID1 takeover remains untested.
 
 Final management direction: [OpenWrt administration](requirements/OPENWRT-MANAGEMENT.md) replaces the OEM interface. LuCI/RPC/HTTPS and optional PPPoE are being added to the cached build; radio UI integration and actual target startup remain unqualified. No private administrative credentials are published.
 

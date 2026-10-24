@@ -1,0 +1,10 @@
+#!/bin/sh
+# First-trial policy: a stock auto-ack is deferred; other env writes fail.
+# The preserved original tool has a separate explicit operator-only path.
+if [ "$#" = 2 ] && [ "$1" = sw_commit ]; then
+    case "$2" in
+        0|1) printf '%s\n' 'R15 trial: automatic boot commit deferred' >&2; exit 0 ;;
+    esac
+fi
+printf '%s\n' 'R15 trial: boot environment write blocked; use explicit operator path' >&2
+exit 1

@@ -1,0 +1,295 @@
+#!/bin/sh
+# Network handoff inside the already booted, authenticated management chroot.
+# Leaves OEM board initialization and wired ports intact. No flash/env writes.
+set -u
+PATH=/sbin:/bin:/usr/sbin:/usr/bin; export PATH
+umask 077
+ROOT=/opt/r15-openwrt
+BASE=/run/r15-network
+LOG=$BASE/logs
+BAND=${1:-2g}
+case "$BAND" in 2g) RADIO=wlan1 ;; 5g) RADIO=wlan0 ;; *) exit 89 ;; esac
+STA=$RADIO-vxd
+DURATION=${2:-0}
+case "$DURATION" in ''|*[!0-9]*) exit 90 ;; esac
+[ "$DURATION" -le 3600 ] || exit 90
+[ -d "$BASE/inputs" ] && [ ! -e "$LOG" ] || exit 91
+[ "$(cat "$BASE/boot-id.expected")" = "$(cat /proc/sys/kernel/random/boot_id)" ] || exit 92
+[ -s /run/r15-management/logs/owned.tsv ] || exit 93
+. "$ROOT/usr/libexec/r15-session-lifecycle.sh"
+while read -r role pid born; do owned "$pid" "$born" || exit 94; done < /run/r15-management/logs/owned.tsv
+[ ! -e /sys/class/net/br-lan ] || exit 95
+mkdir -m 700 "$BASE/pipes" || exit 96
+[ -f "$BASE/inputs/r15_radio" ] || exit 97
+ip -4 addr show dev br0 | grep -q 'inet 192.168.77.1/24' || exit 98
+[ -z "$(ip -4 addr show dev ${STA} | grep 'inet ')" ] || exit 98
+# HTTP may become ready before stock radio startup has finished replacing PIDs.
+attempt=0
+while [ "$attempt" -lt 10 ]; do
+    APID=$(cat /var/run/hapd_${RADIO}_pid.pid 2>/dev/null)
+    SPID=$(cat /var/run/wpas_${RADIO}_vxd_pid.pid 2>/dev/null)
+    case "$APID:$SPID" in *[!0-9:]*|:*|*:) ;; *)
+        if [ "$APID" -gt 1 ] && [ "$SPID" -gt 1 ] &&
+           [ "$(readlink /proc/$APID/exe)" = /usr/bin/hostapd ] &&
+           [ "$(readlink /proc/$SPID/exe)" = /usr/bin/wpa_supplicant ]; then break; fi
+        ;;
+    esac
+    sleep 1; attempt=$((attempt+1))
+done
+case "$APID:$SPID" in *[!0-9:]*|:*|*:) exit 99 ;; esac
+[ "$APID" -gt 1 ] && [ "$SPID" -gt 1 ] || exit 99
+[ "$(readlink /proc/$APID/exe)" = /usr/bin/hostapd ] || exit 100
+[ "$(readlink /proc/$SPID/exe)" = /usr/bin/wpa_supplicant ] || exit 101
+tr '\000' ' ' < "/proc/$APID/cmdline" | grep -Eq "^(/usr/bin/)?hostapd /var/run/hapd_conf_${RADIO} " || exit 102
+tr '\000' ' ' < "/proc/$SPID/cmdline" | grep -Eq "^(/usr/bin/)?wpa_supplicant -D nl80211 -b br0 -i ${STA} " || exit 103
+ABORN=$(starttime "$APID"); SBORN=$(starttime "$SPID")
+hostapd_cli -p /var/run/hostapd -i ${RADIO} all_sta > "$BASE/clients-preflight"
+# Wireless clients may be the authorized test phone rejoining stock after cleanup.
+# Capture them above; this bounded AP handoff is explicitly owner-authorized.
+mkdir -m 700 "$LOG" || exit 105
+: > "$LOG/owned.tsv"; : > "$LOG/mounts.tsv"; : > "$LOG/loggers.tsv"
+for member in /sys/class/net/br0/brif/*; do printf '%s\n' "${member##*/}"; done > "$LOG/baseline-ports"
+printf 'AP\t%s\t%s\nSTA\t%s\t%s\n' "$APID" "$ABORN" "$SPID" "$SBORN" > "$LOG/stock-owners.tsv"
+ip -4 addr show > "$LOG/addresses-before.txt"; ip route show > "$LOG/routes-before.txt"
+DSTOP=0; ASTOP=0; SSTOP=0; CREATED=0; REMOVED=0; FCHAIN=0; NCHAIN=0; FJUMP=0; NJUMP=0
+# The chroot is shared with SSH/HTTPS: never call the broad session cleanup.
+network_cleanup() {
+    stop_records TERM "$LOG/owned.tsv"
+    tries=0
+    while [ "$tries" -lt 12 ]; do
+        live=0
+        while read -r role pid born; do owned "$pid" "$born" && live=1; done < "$LOG/owned.tsv"
+        [ "$live" = 1 ] || break
+        sleep 1; tries=$((tries+1))
+    done
+    stop_records KILL "$LOG/owned.tsv"
+    while read -r role pid born; do
+        if [ "$(starttime "$pid")" = "$born" ]; then kill -TERM "$pid" 2>/dev/null || :; fi
+    done < "$LOG/loggers.tsv"
+    # Only mounts created by this network handoff are eligible for removal.
+    failed=0
+    while read -r target; do umount "$target" || failed=1; done < "$LOG/mounts.tsv"
+    return "$failed"
+}
+finish() {
+    R15_PROBE_RESULT=$?; trap - 0
+    # Remove only this session's chains before private proc/dev mounts disappear.
+    if [ "$FJUMP" = 1 ]; then chroot "$ROOT" /usr/sbin/iptables -D FORWARD -j R15T2_FWD || R15_PROBE_RESULT=150; fi
+    if [ "$NJUMP" = 1 ]; then chroot "$ROOT" /usr/sbin/iptables -t nat -D POSTROUTING -j R15T2_NAT || R15_PROBE_RESULT=151; fi
+    if [ "$FCHAIN" = 1 ]; then chroot "$ROOT" /usr/sbin/iptables -F R15T2_FWD; chroot "$ROOT" /usr/sbin/iptables -X R15T2_FWD || R15_PROBE_RESULT=152; fi
+    if [ "$NCHAIN" = 1 ]; then chroot "$ROOT" /usr/sbin/iptables -t nat -F R15T2_NAT; chroot "$ROOT" /usr/sbin/iptables -t nat -X R15T2_NAT || R15_PROBE_RESULT=153; fi
+    network_cleanup || R15_PROBE_RESULT=120
+    if [ "$REMOVED" = 1 ]; then
+        ip -4 addr flush dev ${STA}
+        ip route del default dev ${STA} 2>/dev/null || :
+    fi
+    if [ "$CREATED" = 1 ]; then
+        if [ -e /sys/class/net/${RADIO}/master ]; then brctl delif br-lan ${RADIO} 2>/dev/null || :; fi
+        ip link set dev br-lan down 2>/dev/null || :
+        brctl delbr br-lan 2>/dev/null || :
+    fi
+    ip link set dev br0 up
+    ip -4 addr show dev br0 | grep -q 'inet 192.168.0.1/24' || ip -4 addr add 192.168.0.1/24 dev br0
+    ip -4 addr show dev br0 | grep -q 'inet 192.168.77.1/24' || ip -4 addr add 192.168.77.1/24 dev br0
+    ip route replace 192.168.77.0/24 dev br0 src 192.168.77.1
+    if [ "$REMOVED" = 1 ]; then
+        for port in ${RADIO} ${STA}; do
+            [ -e "/sys/class/net/$port/master" ] || brctl addif br0 "$port"
+        done
+    fi
+    if [ "$ASTOP" = 1 ] && [ ! -e "/proc/$APID" ]; then
+        /usr/bin/hostapd /var/run/hapd_conf_${RADIO} -g /var/run/hostapd/global.${RADIO} -P /var/run/hapd_${RADIO}_pid.pid -B > "$LOG/stock-ap-restart.log" 2>&1
+    fi
+    if [ "$SSTOP" = 1 ] && [ ! -e "/proc/$SPID" ]; then
+        /usr/bin/wpa_supplicant -D nl80211 -b br0 -i ${STA} -c /var/run/wpas_conf_${RADIO}_vxd -P /var/run/wpas_${RADIO}_vxd_pid.pid -B > "$LOG/stock-sta-restart.log" 2>&1
+    fi
+    if [ "$DSTOP" = 1 ]; then
+        if [ -z "$(pidof dnsmasq)" ]; then
+            /usr/bin/dnsmasq -C /etc/dnsmasq.conf -l /var/run/dnsmasq.leases --user=root --dhcp-hostsdir=/tmp/dhcp/ --quiet-dhcp > "$LOG/stock-dhcp-restart.log" 2>&1 || R15_PROBE_RESULT=164
+        else
+            for remaining in $(pidof dnsmasq); do
+                [ "$(readlink /proc/$remaining/exe)" = /usr/bin/dnsmasq ] || R15_PROBE_RESULT=165
+            done
+        fi
+        [ -n "$(pidof dnsmasq)" ] || R15_PROBE_RESULT=166
+    fi
+    n=0
+    while [ "$n" -lt 30 ]; do
+        hostapd_cli -p /var/run/hostapd -i ${RADIO} status > "$LOG/stock-restore.txt" 2>&1
+        grep -q '^state=ENABLED$' "$LOG/stock-restore.txt" && break
+        sleep 1; n=$((n+1))
+    done
+    grep -q '^state=ENABLED$' "$LOG/stock-restore.txt" || R15_PROBE_RESULT=121
+    touch "$LOG/stop-lifeboat"
+    [ -z "${lifeboat:-}" ] || wait "$lifeboat"
+    ip -4 addr show > "$LOG/addresses-after.txt"; brctl show > "$LOG/bridges-after.txt"
+    printf '%s\n' "$R15_PROBE_RESULT" > "$LOG/result"
+    exit "$R15_PROBE_RESULT"
+}
+trap finish 0
+trap 'exit 143' HUP TERM INT
+if ! awk -v p="$ROOT/sys" '$2==p {found=1} END {exit !found}' /proc/mounts; then
+    mount_new "$ROOT/sys" -o bind /sys || exit 107
+    mount -o remount,bind,ro "$ROOT/sys" || exit 108
+fi
+# Resolve the installed binary and kernel table access before stopping radios.
+chroot "$ROOT" /usr/sbin/iptables -t filter -S > "$LOG/firewall-before.txt" 2> "$LOG/firewall-check.stderr" || exit 163
+mkdir -m 700 "$ROOT/tmp/r15-boot-network" || exit 110
+cat > "$ROOT/tmp/r15-boot-network/network" <<CONF
+config interface 'mgmt'
+    option proto 'none'
+config interface 'lan'
+    option proto 'static'
+    option auto '0'
+    option ipaddr '192.168.88.1'
+    option netmask '255.255.255.0'
+config interface 'wwan'
+    option proto 'dhcp'
+    option auto '0'
+    option metric '200'
+    option peerdns '0'
+CONF
+mkdir -p -m 700 "$ROOT/etc/r15" || exit 136
+for helper in r15-subnet-check r15-dhcp-guard; do
+    [ -f "$ROOT/usr/libexec/$helper" ] || exit 140
+    [ -x "$ROOT/usr/libexec/$helper" ] || exit 141
+done
+cp "$BASE/inputs/r15_radio" "$ROOT/etc/config/r15_radio" || exit 112
+# Validate the profile's actual radio before stopping any OEM process.
+chroot "$ROOT" /usr/bin/lua - "$RADIO" <<'LUA' || exit 176
+local profile=assert(loadfile('/usr/libexec/r15-radio-config.lua'))().from_uci(require('uci').cursor())
+assert(profile and profile.ap==arg[1], 'Profile band does not match handoff')
+LUA
+printf '192.168.77.0/24\n192.168.88.0/24\n' > "$ROOT/etc/r15/protected-subnets" || exit 137
+# Explicitly qualify only the retained stock boot initialization for this UUID.
+printf 'Scope: stock-assisted custom bank boot, retained OEM kernel/drivers/board initialization\nBoot UUID: %s\n' "$(cat "$BASE/boot-id.expected")" > "$ROOT/etc/r15/board-startup-verified" || exit 138
+[ "$(starttime "$SPID")" = "$SBORN" ] || exit 114
+kill -TERM "$SPID" || exit 115
+SSTOP=1
+[ "$(starttime "$APID")" = "$ABORN" ] || exit 116
+kill -TERM "$APID" || exit 117
+ASTOP=1
+n=0; while { [ -e "/proc/$APID" ] || [ -e "/proc/$SPID" ]; } && [ "$n" -lt 8 ]; do sleep 1; n=$((n+1)); done
+[ ! -e "/proc/$APID" ] && [ ! -e "/proc/$SPID" ] || exit 118
+REMOVED=1
+for port in ${RADIO} ${STA}; do
+    if [ -e "/sys/class/net/br0/brif/$port" ]; then
+        brctl delif br0 "$port" || exit 119
+    elif [ -e "/sys/class/net/$port/master" ]; then
+        exit 123
+    fi
+done
+brctl addbr br-lan || exit 124
+CREATED=1
+ip link set dev br-lan up || exit 125
+# Stock 0.1 conflicts with the upstream gateway; Ethernet console stays on 77.1.
+ip -4 addr del 192.168.0.1/24 dev br0 || exit 126
+start_owned client2-netifd /sbin/netifd -S -l 3 -s /var/run/ubus/ubus.sock -c /tmp/r15-boot-network -h /bin/true -r /tmp/r15-boot-network/resolv.conf || exit 128
+for pair in mgmt:br0 lan:br-lan; do
+    iface=${pair%:*}; device=${pair#*:}; n=0
+    while [ "$n" -lt 8 ]; do
+        chroot "$ROOT" /bin/ubus -t 1 call "network.interface.$iface" add_device "{\"name\":\"$device\",\"link-ext\":true}" && break
+        sleep 1; n=$((n+1))
+    done
+    chroot "$ROOT" /bin/ubus -t 1 call network.device status "{\"name\":\"$device\"}" > "$LOG/$iface-device.json" || exit 129
+    grep -q '"external": true' "$LOG/$iface-device.json" || exit 130
+done
+chroot "$ROOT" /bin/ubus -t 1 call network.interface.lan up || exit 131
+# Discard prior stopped session status before starting this controller.
+rm -f "$ROOT/tmp/run/r15-radio/link-state"
+start_owned client2-radio /usr/libexec/r15-radio-launch || exit 132
+n=0; VERIFIED_READY=0
+while [ "$n" -lt 70 ]; do
+    chroot "$ROOT" /usr/sbin/wpa_cli -p /var/run/r15-wpa -i ${STA} status > "$LOG/station-status.txt" 2>&1
+    chroot "$ROOT" /usr/sbin/hostapd_cli -p /var/run/r15-hostapd -i ${RADIO} status > "$LOG/ap-status.txt" 2>&1
+    chroot "$ROOT" /bin/ubus -t 1 call network.interface.wwan status > "$LOG/wwan-status.json" 2>&1
+    if grep -q '^wpa_state=COMPLETED$' "$LOG/station-status.txt" && [ ! -e "$LOG/first-associated.txt" ]; then
+        cp "$LOG/station-status.txt" "$LOG/first-associated.txt"
+    fi
+    if grep -q '"up": true' "$LOG/wwan-status.json" && [ ! -e "$LOG/first-lease.json" ]; then
+        cp "$LOG/wwan-status.json" "$LOG/first-lease.json"
+    fi
+    while read -r role pid born; do
+        [ "$role" != client2-radio ] || owned "$pid" "$born" || exit 139
+    done < "$LOG/owned.tsv"
+    if [ -r "$ROOT/tmp/run/r15-radio/link-state" ]; then
+        cp "$ROOT/tmp/run/r15-radio/link-state" "$LOG/link-state.txt"
+        current=$(awk '$1=="client2-radio" {print $2}' "$LOG/owned.tsv")
+        controller=$(sed -n 's/^controller_pid=//p' "$LOG/link-state.txt")
+        case "$controller" in ''|*[!0-9]*) controller=0 ;; esac
+        if [ "$controller" -gt 1 ] &&
+           grep -q '^ready=1$' "$LOG/link-state.txt" &&
+           [ "$(readlink /proc/$controller/root)" = "$ROOT" ] &&
+           [ "$(awk '/^PPid:/ {print $2}' /proc/$controller/status)" = "$current" ] &&
+           grep -q '^wpa_state=COMPLETED$' "$LOG/station-status.txt" &&
+           grep -q '^state=ENABLED$' "$LOG/ap-status.txt" &&
+           grep -q '"up": true' "$LOG/wwan-status.json"; then VERIFIED_READY=1; break; fi
+    fi
+    sleep 1; n=$((n+1))
+done
+[ "$VERIFIED_READY" = 1 ] || exit 133
+ip route get 1.1.1.1 > "$LOG/traffic-route.txt"
+grep -q "dev ${STA}" "$LOG/traffic-route.txt" || exit 134
+chroot "$ROOT" /bin/busybox ping -I ${STA} -c 10 -W 2 -w 25 1.1.1.1 > "$LOG/source-bound-ping.txt" 2>&1 || exit 135
+event custom-ap-sta-dhcp-channel-and-router-ping-pass
+
+# Qualify the candidate OpenWrt iptables userspace, not a stock firewall restart.
+chroot "$ROOT" /usr/sbin/iptables -N R15T2_FWD || exit 154
+FCHAIN=1
+chroot "$ROOT" /usr/sbin/iptables -A R15T2_FWD -i br-lan -o ${STA} -s 192.168.88.0/24 -j ACCEPT || exit 155
+chroot "$ROOT" /usr/sbin/iptables -A R15T2_FWD -i ${STA} -o br-lan -d 192.168.88.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT || exit 156
+chroot "$ROOT" /usr/sbin/iptables -t nat -N R15T2_NAT || exit 157
+NCHAIN=1
+chroot "$ROOT" /usr/sbin/iptables -t nat -A R15T2_NAT -s 192.168.88.0/24 -o ${STA} -j MASQUERADE || exit 158
+chroot "$ROOT" /usr/sbin/iptables -I FORWARD 1 -j R15T2_FWD || exit 159
+FJUMP=1
+chroot "$ROOT" /usr/sbin/iptables -t nat -I POSTROUTING 1 -j R15T2_NAT || exit 160
+NJUMP=1
+cat > "$ROOT/tmp/client2-dnsmasq.conf" <<CONF
+interface=br-lan
+listen-address=192.168.88.1
+bind-interfaces
+except-interface=lo
+no-hosts
+no-resolv
+user=root
+keep-in-foreground
+log-facility=-
+log-dhcp
+dhcp-authoritative
+dhcp-range=192.168.88.110,192.168.88.150,255.255.255.0,1h
+dhcp-option=3,192.168.88.1
+dhcp-option=6,192.168.88.1
+dhcp-leasefile=/var/run/client2.leases
+pid-file=/var/run/client2-dnsmasq.pid
+CONF
+gateway=$(ip route show default dev ${STA} | awk '$1=="default" && $2=="via" {print $3;exit}')
+printf '%s\n' "$gateway" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$' || exit 173
+printf "server=%s@${STA}\n" "$gateway" >> "$ROOT/tmp/client2-dnsmasq.conf" || exit 174
+DPID=$(pidof dnsmasq)
+case "$DPID" in ''|*[!0-9]*) exit 167 ;; esac
+[ "$DPID" -gt 1 ] && [ "$(readlink /proc/$DPID/exe)" = /usr/bin/dnsmasq ] || exit 168
+tr '\000' ' ' < "/proc/$DPID/cmdline" | grep -Eq '^(/usr/bin/)?dnsmasq -C /etc/dnsmasq.conf -l /var/run/dnsmasq.leases --user=root --dhcp-hostsdir=/tmp/dhcp/ --quiet-dhcp ' || exit 169
+DBORN=$(starttime "$DPID")
+printf 'DHCP\t%s\t%s\n' "$DPID" "$DBORN" >> "$LOG/stock-owners.tsv"
+openssl dgst -sha256 /usr/bin/dnsmasq /etc/dnsmasq.conf > "$LOG/stock-dhcp-hashes.txt"
+[ "$(starttime "$DPID")" = "$DBORN" ] || exit 170
+kill -TERM "$DPID" || exit 171
+DSTOP=1
+n=0; while [ -e "/proc/$DPID" ] && [ "$n" -lt 8 ]; do sleep 1; n=$((n+1)); done
+[ ! -e "/proc/$DPID" ] || exit 172
+start_owned client2-dnsmasq /usr/sbin/dnsmasq --conf-file=/tmp/client2-dnsmasq.conf || exit 161
+printf 'CLIENT_TEST_READY\n' > "$LOG/client-ready.txt"
+event client-dhcp-dns-nat-ready
+n=0
+while { [ "$DURATION" = 0 ] || [ "$n" -lt "$DURATION" ]; }; do
+    [ -e "$LOG/stop-client-test" ] && break
+    ip route replace 192.168.77.0/24 dev br0 src 192.168.77.1 || exit 175
+    chroot "$ROOT" /usr/sbin/hostapd_cli -p /var/run/r15-hostapd -i ${RADIO} all_sta > "$LOG/client-stations.txt" 2>&1
+    [ ! -f "$ROOT/tmp/run/client2.leases" ] || cp "$ROOT/tmp/run/client2.leases" "$LOG/client-leases.txt"
+    chroot "$ROOT" /usr/sbin/iptables -v -n -L R15T2_FWD > "$LOG/forward-counters.txt"
+    chroot "$ROOT" /usr/sbin/iptables -t nat -v -n -L R15T2_NAT > "$LOG/nat-counters.txt"
+    while read -r role pid born; do owned "$pid" "$born" || exit 162; done < "$LOG/owned.tsv"
+    sleep 2; n=$((n+2))
+done
+event client-observation-ended

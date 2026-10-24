@@ -1,0 +1,92 @@
+#!/bin/sh
+# First R15 A1 experiment: stage bank1 while booted/committed on bank0.
+# No boot selector, environment, raw NAND, UBI formatting, or reboot operations.
+set -u
+PATH=/sbin:/bin:/usr/sbin:/usr/bin; export PATH
+umask 077
+hash_file() { openssl dgst -sha256 "$1" | awk '{print $NF}'; }
+hex64() { [ "${#1}" = 64 ] && case "$1" in *[!a-f0-9]*) return 1 ;; *) return 0 ;; esac; }
+parse_manifest() {
+    awk -F= 'NF!=2 || $1 !~ /^(boot_id|kernel_sha|rootfs_sha|rootfs_bytes|old_kernel_sha|old_rootfs_sha|mac|updater_sha|env_reader_sha)$/ || seen[$1]++ {bad=1} END {exit bad || NR!=9}' "$1" || return 1
+    BOOT_ID=$(sed -n 's/^boot_id=//p' "$1")
+    KERNEL_SHA=$(sed -n 's/^kernel_sha=//p' "$1")
+    ROOTFS_SHA=$(sed -n 's/^rootfs_sha=//p' "$1")
+    ROOTFS_BYTES=$(sed -n 's/^rootfs_bytes=//p' "$1")
+    OLD_KERNEL_SHA=$(sed -n 's/^old_kernel_sha=//p' "$1")
+    OLD_ROOTFS_SHA=$(sed -n 's/^old_rootfs_sha=//p' "$1")
+    EXPECTED_MAC=$(sed -n 's/^mac=//p' "$1")
+    UPDATER_SHA=$(sed -n 's/^updater_sha=//p' "$1")
+    ENV_READER_SHA=$(sed -n 's/^env_reader_sha=//p' "$1")
+    for value in "$KERNEL_SHA" "$ROOTFS_SHA" "$OLD_KERNEL_SHA" "$OLD_ROOTFS_SHA" "$UPDATER_SHA" "$ENV_READER_SHA"; do hex64 "$value" || return 1; done
+    [ "$KERNEL_SHA" = cd43f6c7dbdff5bda8da896380b8b7bfa66e85ba5af6e1601d99d9096b39fcd9 ] || return 1
+    printf '%s\n' "$BOOT_ID" | grep -Eq '^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$' || return 1
+    printf '%s\n' "$EXPECTED_MAC" | grep -Eq '^([a-f0-9]{2}:){5}[a-f0-9]{2}$' || return 1
+    case "$ROOTFS_BYTES" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$ROOTFS_BYTES" -ge 96 ] && [ "$ROOTFS_BYTES" -le 36823040 ] || return 1
+}
+phase() { printf '%s\n' "$1" > "$BASE/state"; printf '%s\t%s\n' "$(cut -d ' ' -f 1 /proc/uptime)" "$1" >> "$BASE/events.tsv"; }
+update_volume() { /usr/bin/ubiupdatevol "$1" "$2"; }
+verify_written() {
+    computed=$(head -c "$2" "$1" | openssl dgst -sha256 | awk '{print $NF}')
+    [ "$computed" = "$3" ]
+}
+write_images() {
+    phase writing-inactive-rootfs
+    update_volume /dev/ubi0_4 "$BASE/rootfs.sqfs" || return 140
+    verify_written /dev/ubi0_4 "$ROOTFS_BYTES" "$ROOTFS_SHA" || return 141
+    phase inactive-rootfs-readback-passed
+    update_volume /dev/ubi0_3 "$BASE/kernel.uimage" || return 142
+    verify_written /dev/ubi0_3 3783628 "$KERNEL_SHA" || return 143
+    phase inactive-pair-readback-passed
+}
+main() {
+    [ "${1:-}" = --write-inactive-only ] && [ "$#" = 2 ] || return 90
+    BASE=$2
+    printf '%s\n' "$BASE" | grep -Eq '^/run/r15-image-stage-[a-f0-9]{12}$' || return 91
+    [ "$(id -u)" = 0 ] || return 92
+    [ -d "$BASE" ] && [ ! -L "$BASE" ] || return 93
+    awk '$2=="/run" && $3=="tmpfs" {yes=1} END {exit !yes}' /proc/mounts || return 94
+    for name in manifest.txt kernel.uimage rootfs.sqfs; do
+        [ -f "$BASE/$name" ] && [ ! -L "$BASE/$name" ] || return 95
+    done
+    [ ! -e "$BASE/state" ] && [ ! -L "$BASE/state" ] || return 96
+    R15_STAGE_OWNED=1
+    parse_manifest "$BASE/manifest.txt" || return 97
+    [ "$BOOT_ID" = "$(cat /proc/sys/kernel/random/boot_id)" ] || return 98
+    [ "$EXPECTED_MAC" = "$(cat /sys/class/net/br0/address)" ] || return 99
+    awk '{for(i=1;i<=NF;i++){if($i~/^root=/){r++;if($i!="root=31:9")bad=1}if($i~/^ubi.mtd=/){u++;if($i!="ubi.mtd=5")bad=1}}} END {exit bad || r!=1 || u!=1}' /proc/cmdline || return 100
+    [ "$(cat /sys/class/ubi/ubi0/mtd_num)" = 5 ] || return 101
+    for pair in 1:ubi_k0 2:ubi_r0 3:ubi_k1 4:ubi_r1; do
+        number=${pair%:*}; name=${pair#*:}
+        [ "$(cat /sys/class/ubi/ubi0_$number/name)" = "$name" ] || return 102
+    done
+    for pair in 3:83 4:290; do
+        number=${pair%:*}; blocks=${pair#*:}; device=/sys/class/ubi/ubi0_$number
+        [ "$(cat "$device/type")" = dynamic ] && [ "$(cat "$device/reserved_ebs")" = "$blocks" ] &&
+        [ "$(cat "$device/usable_eb_size")" = 126976 ] && [ "$(cat "$device/upd_marker")" = 0 ] &&
+        [ "$(cat "$device/corrupted")" = 0 ] || return 103
+    done
+    awk '$1 ~ /^\/dev\/(ubi0_[34]|ubiblock0_[34]|mtdblock(10|11))$/ || $1 ~ /^ubi0:ubi_[kr]1$/ {bad=1} END {exit bad?1:0}' /proc/mounts || return 104
+    [ "$(hash_file /usr/bin/ubiupdatevol)" = "$UPDATER_SHA" ] && [ "$(hash_file /usr/bin/fw_printenv)" = "$ENV_READER_SHA" ] || return 105
+    /usr/bin/fw_printenv -n sw_commit > "$BASE/commit.txt" 2> "$BASE/env-error.txt" || return 106
+    [ ! -s "$BASE/env-error.txt" ] && [ "$(cat "$BASE/commit.txt")" = 0 ] || return 107
+    /usr/bin/fw_printenv -n sw_tryactive > "$BASE/try.txt" 2> "$BASE/env-error.txt" || return 108
+    [ ! -s "$BASE/env-error.txt" ] && [ "$(cat "$BASE/try.txt")" = 2 ] || return 109
+    [ "$(wc -c < "$BASE/kernel.uimage")" -eq 3783628 ] && [ "$(wc -c < "$BASE/rootfs.sqfs")" -eq "$ROOTFS_BYTES" ] || return 110
+    [ "$(hash_file "$BASE/kernel.uimage")" = "$KERNEL_SHA" ] && [ "$(hash_file "$BASE/rootfs.sqfs")" = "$ROOTFS_SHA" ] || return 111
+    [ "$(head -c 4 "$BASE/rootfs.sqfs")" = hsqs ] || return 112
+    # Confirm both original inactive volumes match the verified off-device
+    # logical backups. These checks precede the first write.
+    [ "$(hash_file /dev/mtd10ro)" = "$OLD_KERNEL_SHA" ] && [ "$(hash_file /dev/mtd11ro)" = "$OLD_ROOTFS_SHA" ] || return 113
+    [ "$(head -c 3783628 /dev/mtd8ro | openssl dgst -sha256 | awk '{print $NF}')" = "$KERNEL_SHA" ] || return 114
+    phase preconditions-passed-no-write-yet
+    write_images || return $?
+    phase STAGED_NOT_SELECTED
+}
+if [ "${R15_STAGE_SOURCE_ONLY:-0}" != 1 ]; then
+    trap '' HUP
+    main "$@"
+    result=$?
+    if [ "${R15_STAGE_OWNED:-0}" = 1 ]; then printf '%s\n' "$result" > "$BASE/result"; fi
+    exit "$result"
+fi

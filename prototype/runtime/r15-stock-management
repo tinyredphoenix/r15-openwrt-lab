@@ -1,0 +1,125 @@
+#!/bin/sh
+# Management bridge after OEM board initialization; never PID1 or radio startup.
+# ROOT must contain a unit-specific SSH host key and owner authorized_keys.
+set -u
+PATH=/sbin:/bin:/usr/sbin:/usr/bin; export PATH
+umask 077
+ROOT=${1:-/opt/r15-openwrt}
+BASE=${2:-/run/r15-management}
+DURATION=${3:-0}
+printf '%s\n' "$ROOT" | grep -Eq '^(/opt/r15-openwrt|/run/r15-phase3-[a-f0-9]{12}/rootfs)$' || exit 90
+printf '%s\n' "$BASE" | grep -Eq '^/run/r15-management(-test-[a-f0-9]{12})?$' || exit 91
+case "$DURATION" in ''|*[!0-9]*) exit 92 ;; esac
+[ "$DURATION" -le 3600 ] || exit 92
+[ "$(id -u)" = 0 ] || exit 93
+[ -d "$ROOT" ] && [ ! -L "$ROOT" ] || exit 94
+[ ! -e "$BASE" ] && [ ! -L "$BASE" ] || exit 95
+awk '$2=="/run" && $3=="tmpfs" {ok=1} END {exit !ok}' /proc/mounts || exit 96
+[ -s "$ROOT/etc/dropbear/authorized_keys" ] && [ -s "$ROOT/etc/dropbear/dropbear_ed25519_host_key" ] || exit 97
+[ -f "$ROOT/usr/libexec/r15-session-lifecycle.sh" ] || exit 98
+awk -v p="$ROOT" '$2==p || index($2,p"/")==1 {found=1} END {exit found?1:0}' /proc/mounts || exit 99
+mkdir -m 700 "$BASE" || exit 100
+LOG=$BASE/logs
+mkdir -m 700 "$LOG" "$BASE/pipes" || exit 101
+. "$ROOT/usr/libexec/r15-session-lifecycle.sh"
+[ -z "$(root_processes)" ] || exit 102
+: > "$LOG/owned.tsv"; : > "$LOG/mounts.tsv"; : > "$LOG/loggers.tsv"
+NETWORK_PID=; NETWORK_BIRTH=
+stop_network() {
+    [ -n "$NETWORK_PID" ] || return 0
+    if [ "$(starttime "$NETWORK_PID")" = "$NETWORK_BIRTH" ]; then
+        kill -TERM "$NETWORK_PID" 2>/dev/null || :
+        tries=0
+        while [ "$(starttime "$NETWORK_PID")" = "$NETWORK_BIRTH" ] && [ "$tries" -lt 45 ]; do
+            sleep 1; tries=$((tries+1))
+        done
+        [ "$(starttime "$NETWORK_PID")" != "$NETWORK_BIRTH" ] || return 1
+    fi
+    wait "$NETWORK_PID" 2>/dev/null || :
+    NETWORK_PID=
+}
+finish() {
+    R15_MANAGEMENT_RESULT=$?; trap - 0
+    stop_network || R15_MANAGEMENT_RESULT=131
+    cleanup || R15_MANAGEMENT_RESULT=130
+    printf '%s\n' "$R15_MANAGEMENT_RESULT" > "$BASE/result"
+    exit "$R15_MANAGEMENT_RESULT"
+}
+trap finish 0
+trap 'exit 143' TERM INT HUP
+# OEM bootstrap may still be bringing up the switch. Wait; never synthesize
+# ports, GPIOs, calibration, MACs, watchdog settings, or a generic board init.
+n=0; board=0
+while [ "$n" -lt 120 ]; do
+    for port in eth0.3.0 eth0.4.0 eth0.5.0; do
+        if [ -e "/sys/class/net/br0/brif/$port" ]; then board=1; break; fi
+    done
+    [ "$board" = 0 ] || break
+    sleep 1; n=$((n+1))
+done
+[ "$board" = 1 ] || exit 103
+ensure_management() {
+    [ -d /sys/class/net/br0/brif ] || return 1
+    ip link set dev br0 up || return 1
+    ip -4 addr show dev br0 | grep -q 'inet 192.168.77.1/24' || ip -4 addr add 192.168.77.1/24 dev br0 || return 1
+    # Late OEM startup can flush connected routes while leaving aliases intact.
+    ip route replace 192.168.77.0/24 dev br0 src 192.168.77.1
+}
+ensure_management || exit 105
+# Configuration is deliberately volatile in this first boot stage. Preserve
+# the immutable template and never mount/format a stock configuration volume.
+mkdir -m 700 "$BASE/etc" || exit 106
+cp -a "$ROOT/etc/." "$BASE/etc/" || exit 107
+mount_new "$ROOT/etc" -o bind "$BASE/etc" || exit 108
+mount_new "$ROOT/tmp" -t tmpfs -o mode=1777,size=32m tmpfs || exit 109
+mkdir -p "$ROOT/tmp/run/ubus" "$ROOT/tmp/lock" "$ROOT/tmp/log" || exit 110
+mount_new "$ROOT/proc" -t proc -o ro,nosuid,nodev,noexec proc || exit 111
+for device in null zero random urandom; do
+    mount_new "$ROOT/dev/$device" -o bind "/dev/$device" || exit 112
+done
+start_owned boot-ubus /sbin/ubusd -s /var/run/ubus/ubus.sock || exit 113
+start_owned boot-procd /sbin/procd -S -d 2 -s /var/run/ubus/ubus.sock || exit 114
+n=0
+while [ "$n" -lt 15 ]; do
+    chroot "$ROOT" /bin/ubus -s /var/run/ubus/ubus.sock -t 1 list system > "$LOG/system.txt" 2>&1 && break
+    sleep 1; n=$((n+1))
+done
+[ "$n" -lt 15 ] || exit 115
+start_owned boot-rpcd /sbin/rpcd -s /var/run/ubus/ubus.sock -t 30 || exit 116
+start_owned boot-ssh /usr/sbin/dropbear -F -E -s -j -k -p 192.168.77.1:2222 -r /etc/dropbear/dropbear_ed25519_host_key -P /var/run/dropbear.pid || exit 117
+start_owned boot-https /usr/sbin/uhttpd -f -s 192.168.77.1:8443 -C /etc/uhttpd.crt -K /etc/uhttpd.key -h /www -x /cgi-bin -u /ubus -U /var/run/ubus/ubus.sock -I index.html -E /cgi-bin/luci -D -q -t 60 -T 30 || exit 118
+printf 'SPAWNED: authenticated endpoint checks required; not boot qualification\n' > "$BASE/state"
+event management-services-spawned
+# Start the network handoff only for an explicitly enabled private profile.
+# Its process records and cleanup are separate from these management daemons.
+enabled=$(chroot "$ROOT" /sbin/uci -q get r15_radio.repeater.enabled 2>/dev/null) || enabled=0
+if [ "$enabled" = 1 ]; then
+    band=$(chroot "$ROOT" /sbin/uci -q get r15_radio.repeater.band 2>/dev/null) || band=invalid
+    case "$band" in 2g|5g)
+        if [ ! -e /run/r15-network ] && mkdir -m 700 /run/r15-network && mkdir -m 700 /run/r15-network/inputs &&
+           cp "$ROOT/etc/config/r15_radio" /run/r15-network/inputs/r15_radio &&
+           cat /proc/sys/kernel/random/boot_id > /run/r15-network/boot-id.expected &&
+           mkfifo -m 600 "$BASE/pipes/boot-network"; then
+            chroot "$ROOT" /usr/bin/lua /usr/libexec/r15-caplog.lua < "$BASE/pipes/boot-network" > "$LOG/boot-network.log" 2> "$LOG/boot-network.logger-stderr" &
+            logger_pid=$!; logger_born=$(starttime "$logger_pid")
+            printf 'boot-network\t%s\t%s\n' "$logger_pid" "$logger_born" >> "$LOG/loggers.tsv"
+            /bin/sh "$ROOT/usr/libexec/r15-network-handoff" "$band" 0 < /dev/null > "$BASE/pipes/boot-network" 2>&1 &
+            NETWORK_PID=$!; NETWORK_BIRTH=$(starttime "$NETWORK_PID")
+            printf '%s\t%s\n' "$NETWORK_PID" "$NETWORK_BIRTH" > "$BASE/network-owner"
+            event network-handoff-dispatched
+        else
+            event network-handoff-preparation-failed
+        fi
+        ;;
+    *) event network-handoff-invalid-band ;;
+    esac
+fi
+n=0
+while [ "$DURATION" = 0 ] || [ "$n" -lt "$DURATION" ]; do
+    [ ! -e "$BASE/stop" ] || exit 0
+    # Stock startup may refresh bridge addresses after the first port appears.
+    # Maintain our alias and return route without changing bridge membership.
+    ensure_management || event management-address-pending
+    while read -r role pid born; do owned "$pid" "$born" || exit 119; done < "$LOG/owned.tsv"
+    sleep 2; n=$((n+2))
+done

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Trial bank must not commit itself through the legacy nv helper.
+printf '%s\n' 'R15 trial: legacy firmware acknowledgement deferred' >&2
+exit 0
