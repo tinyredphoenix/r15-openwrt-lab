@@ -1,5 +1,12 @@
 # D-Link R15 A1 OpenWrt research
 
+Current direction: **port the normal OpenWrt system**, using the proven vendor
+kernel/driver compatibility where necessary. The flashed OEM-PID1/chroot image is
+a diagnostic prototype, not the finished port. See
+[the port boundary](requirements/OPENWRT-PORT-BOUNDARY.md). Generic OpenWrt
+base-files/preinit/inittab and standard fstools/UBI/package-management builds are
+now being integrated; no replacement configuration framework is being developed.
+
 Work toward a minimal routed wireless repeater for the Indian R15 A1, with wired management independent of the Wi-Fi uplink. **This public repository contains research source, not a downloadable installation image. A private, unit-specific stock-assisted image has booted on the owner’s R15.**
 
 Observed stock firmware 1.06.10 uses RTL8198D, big-endian MIPS interAptiv, Linux 4.4.140; RTL8852AE (`wlan0`, PCI 10ec:8852) and RTL8192FE (`wlan1`, PCI 10ec:818c). Both create VXD client interfaces. The running stock kernel reports 256 MiB physical RAM (about 238.8 MiB MemTotal). These observations do not establish OpenWrt driver compatibility.

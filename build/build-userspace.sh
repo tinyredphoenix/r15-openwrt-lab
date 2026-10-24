@@ -98,7 +98,8 @@ for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
     CONFIG_PACKAGE_luci=y CONFIG_PACKAGE_ppp=y CONFIG_PACKAGE_ppp-mod-pppoe=y \
     CONFIG_PACKAGE_uhttpd=y CONFIG_PACKAGE_rpcd=y CONFIG_PACKAGE_libustream-openssl=y \
     CONFIG_PACKAGE_cgi-io=y CONFIG_PACKAGE_luci-compat=y CONFIG_PACKAGE_libuci-lua=y \
-    CONFIG_PACKAGE_luci-lib-nixio_openssl=y; do
+    CONFIG_PACKAGE_luci-lib-nixio_openssl=y CONFIG_PACKAGE_fstools=y CONFIG_PACKAGE_fwtool=y \
+    CONFIG_PACKAGE_opkg=y CONFIG_PACKAGE_ubi-utils=y CONFIG_NAND_SUPPORT=y CONFIG_FSTOOLS_UBIFS_EXTROOT=y; do
     grep -qx "$symbol" "$SDK/.config" || { echo "Missing build setting: $symbol" >&2; exit 1; }
 done
 python3 "$ROOT/build/selected-recipes.py" "$SDK" > "$ROOT/artifacts/selected-recipes.txt"
@@ -135,6 +136,10 @@ python3 "$ROOT/build/stage-luci-radio.py" "$ROOT/artifacts/rootfs" "$ROOT/artifa
 python3 "$ROOT/build/stage-dhcp-guard.py" "$ROOT/artifacts/rootfs" "$ROOT/artifacts/dhcp-guard-staging.json"
 python3 "$ROOT/build/stage-common-runtime.py" "$SOURCE/package/base-files/files" \
     "$ROOT/artifacts/rootfs" "$ROOT/artifacts/common-runtime.json"
+python3 "$ROOT/build/stage-openwrt-base.py" \
+    --source "$SOURCE/package/base-files/files" \
+    --output "$ROOT/artifacts/openwrt-base-foundation.tar" \
+    --report "$ROOT/artifacts/openwrt-base-foundation.json"
 python3 - "$ROOT/artifacts/build-report.json" "$ROOT/artifacts/common-runtime.json" <<'PY'
 import json, sys
 from pathlib import Path

@@ -1,0 +1,604 @@
+{
+  "repository": "openwrt/openwrt",
+  "commit": "57a6d97ddf8f6541a52e0f8fad8c6f47685a1bc3",
+  "source_only": true,
+  "files": [
+    {
+      "path": "bin/board_detect",
+      "mode": "100755",
+      "git_blob": "840bd0178d14101f8a36932b438d8c38ed09f1fa",
+      "sha256": "3445b91622cdb12f5215440dae8d8a137a9456234eb1027216cf4a230c300b09",
+      "bytes": 205
+    },
+    {
+      "path": "bin/config_generate",
+      "mode": "100755",
+      "git_blob": "38362813d1924c715235c8259b593f0335029b9c",
+      "sha256": "f92636f57a1c1fad61485513ea53c5d198d78eb75e8073dedc2bc48739575a0d",
+      "bytes": 11819
+    },
+    {
+      "path": "bin/ipcalc.sh",
+      "mode": "100755",
+      "git_blob": "5d5eac3ea80b8e0b9a11ff6139d701a9618a8149",
+      "sha256": "0e170cfb8015c2c589c58f835224aa3f6bb33e8a12eb07888e304ba27f54f548",
+      "bytes": 1550
+    },
+    {
+      "path": "etc/banner",
+      "mode": "100644",
+      "git_blob": "f3af3c014f20f1b1157bde1cadae64cab0189c9f",
+      "sha256": "4be774f7a36573a8ef970a4ed1c0571043edb0078308ff264c793cacbd53d6d6",
+      "bytes": 372
+    },
+    {
+      "path": "etc/banner.failsafe",
+      "mode": "100644",
+      "git_blob": "49855e7133cf6c2eda0fcdcfd84ca2c864d95ae6",
+      "sha256": "fa1429cb2a86469f4ddf70f61e355b55788d33975992c6374f4c5ca7c03780f9",
+      "bytes": 461
+    },
+    {
+      "path": "etc/board.d/99-default_network",
+      "mode": "100755",
+      "git_blob": "d70aa352b9214a1ef0454d20d599ba0af452afb3",
+      "sha256": "e2c1ceb8b6105ecd17a2c0346f5e257552500cccad1fed4fadbfb7895437fbc5",
+      "bytes": 266
+    },
+    {
+      "path": "etc/device_info",
+      "mode": "100644",
+      "git_blob": "4045e9e027de50a9ff8f84b2177c2b6e9d00a396",
+      "sha256": "1378e1ec8c46429762870e28f4e64e079fece26e76ea6b3495fc6be8645c6418",
+      "bytes": 95
+    },
+    {
+      "path": "etc/diag.sh",
+      "mode": "100644",
+      "git_blob": "37a8ec758ed030944b1f372278bd9f852f3502ff",
+      "sha256": "6eb1bce44d815f2bacbb0d929421d53b883ee24650d684dc82a1a0462d6720ec",
+      "bytes": 948
+    },
+    {
+      "path": "etc/ethers",
+      "mode": "100644",
+      "git_blob": "b92c200a4bb5ea046e31334d836de36241637305",
+      "sha256": "56bda09b0aa3d1e88107bfa8a1c6e4449d5c1f47245dc1c4037ff9b5db163b7c",
+      "bytes": 130
+    },
+    {
+      "path": "etc/fstab",
+      "mode": "100644",
+      "git_blob": "6e9b7baf53c904eb82320cd1cb3c8a45efd1a823",
+      "sha256": "bdf59c1cd092f180f21815b7ac2aed1c5709a492f1396511631192ff610e5f00",
+      "bytes": 61
+    },
+    {
+      "path": "etc/group",
+      "mode": "100644",
+      "git_blob": "5b06dc6db96418461484d112c75797bf137c683d",
+      "sha256": "45e8cab268d4a2254d48ccb1f889630047e81758de54a614cad5449fdbebe19c",
+      "bytes": 137
+    },
+    {
+      "path": "etc/hosts",
+      "mode": "100644",
+      "git_blob": "b7713ebcc68ac10f3b2209d24e0555816a2000ef",
+      "sha256": "c1a978d90673437b35fa9494e0a54294062c152bb653d490b718052ab88447fd",
+      "bytes": 110
+    },
+    {
+      "path": "etc/hotplug.d/net/00-sysctl",
+      "mode": "100644",
+      "git_blob": "8abe7f8bbd698dc58716b770fe8bc7f8bd475b58",
+      "sha256": "d294992711d4fbb48d621b291ef440d50250de7d86969cb8d8f95cda52efaaab",
+      "bytes": 236
+    },
+    {
+      "path": "etc/init.d/boot",
+      "mode": "100755",
+      "git_blob": "749d9e971141c63542e220bbd5c175f40041b174",
+      "sha256": "1702ed7792c35e056286662c984d9a63aa7d186b307f9b29265be13c2c9a8b41",
+      "bytes": 1333
+    },
+    {
+      "path": "etc/init.d/done",
+      "mode": "100755",
+      "git_blob": "32d6118df760aa0f6780051459b9db4197eee567",
+      "sha256": "a0ab74adcc109ffc4987c5b81fc55acbd656cde0ff9d4d8a048f0864e668556d",
+      "bytes": 263
+    },
+    {
+      "path": "etc/init.d/gpio_switch",
+      "mode": "100755",
+      "git_blob": "24d790b065c1656bbd03ca34d963b4dda1990d63",
+      "sha256": "02f382d7cc0b538a38d314be346c5d752bcdc9434c4c8481026ce3a991dd7ea4",
+      "bytes": 1379
+    },
+    {
+      "path": "etc/init.d/led",
+      "mode": "100755",
+      "git_blob": "277fb4e76f7eb9bf812ad4f0831edb8ff4f1189c",
+      "sha256": "af63393541136c04e882b225275d72f1bd33481795a66a160ad671e19e68b923",
+      "bytes": 3502
+    },
+    {
+      "path": "etc/init.d/sysctl",
+      "mode": "100755",
+      "git_blob": "4db56444c7c6e1ee9b6e92f8afab41b082799107",
+      "sha256": "4cf88ade47f2fb71c8ad5db9f605e20a8d1cf64d28e1934da75c8b19a17d7584",
+      "bytes": 1212
+    },
+    {
+      "path": "etc/init.d/sysfixtime",
+      "mode": "100755",
+      "git_blob": "aab5b153d0714fdead6fa70b3f6347dacbbead74",
+      "sha256": "7bd44b069ae231e611f58edf92d7c5b8253d9931c66c3051618dd620b7ac2d5c",
+      "bytes": 662
+    },
+    {
+      "path": "etc/init.d/system",
+      "mode": "100755",
+      "git_blob": "dcfc2616c6d84467bd0c1b0a6f3b526c7a81c360",
+      "sha256": "55a16f8e7940740d3370a2c4f80ccaeea905082fba5f358096c27401bf7ab82a",
+      "bytes": 1007
+    },
+    {
+      "path": "etc/init.d/umount",
+      "mode": "100755",
+      "git_blob": "b764ae15829a0b45722de251f0ccd3a098f88c1a",
+      "sha256": "b7e3dbb6d8d8c2f2fad0468bc1d4c0ad833adec164d701a7e59e2b579db9c2ce",
+      "bytes": 125
+    },
+    {
+      "path": "etc/inittab",
+      "mode": "100644",
+      "git_blob": "9820e7144bed618f1375661f4e413f1b4979b584",
+      "sha256": "8b395f7d827753e1e92d4a1c369d9fe16caa23bf742b3f78e4599c4dd9b1b6e3",
+      "bytes": 106
+    },
+    {
+      "path": "etc/iproute2/ematch_map",
+      "mode": "100644",
+      "git_blob": "4d6bb2f039789d0666a8788c6de114737eb06b93",
+      "sha256": "0b1d73102310eedcb0b6a6f1b104c40d9d7a33ab5150c88a4698d0d6ab2b8659",
+      "bytes": 81
+    },
+    {
+      "path": "etc/iproute2/rt_protos",
+      "mode": "100644",
+      "git_blob": "5b61798aecb144c7ac0e3866643c2588b7b79970",
+      "sha256": "a0712b1771c8d5f3e0dcf9a6314880e71aa3498ea1ae873535bdfcf70d814061",
+      "bytes": 152
+    },
+    {
+      "path": "etc/iproute2/rt_tables",
+      "mode": "100644",
+      "git_blob": "5fc09b3c0cfdfc64264164e12946b97fe7b40668",
+      "sha256": "f771e2b81741f70e3faf658dc504f0dc048672fc8caaadea15e46c35da3de8f8",
+      "bytes": 100
+    },
+    {
+      "path": "etc/openwrt_release",
+      "mode": "100644",
+      "git_blob": "d03400ca05306d2ad7eef66a219f3290da0309f1",
+      "sha256": "7d7aca6cd9c60a7a6aa5f1ba9b3a0989c3011b6e75198b72769ade7db7ba7e58",
+      "bytes": 148
+    },
+    {
+      "path": "etc/openwrt_version",
+      "mode": "100644",
+      "git_blob": "48157ed97f7accee98c7d81c99c27d135ec1a495",
+      "sha256": "06a5df811b7a2c06c83b7fd4984153cd1c06bec5c6bda9f5a0b184ee8a6c5fc9",
+      "bytes": 3
+    },
+    {
+      "path": "etc/os-release",
+      "mode": "120000",
+      "git_blob": "c4c75b419cfd1a831f48769e8b4ac8680f728654",
+      "sha256": "d9a42455139e2bd87a1946abb3b066fb51863cfb3ddff03244e203a5a22020a8",
+      "bytes": 21
+    },
+    {
+      "path": "etc/passwd",
+      "mode": "100644",
+      "git_blob": "1d06a803615f4e524bd60f2d72cdb99b54915a99",
+      "sha256": "6a451aa33393f47ade89b8bce4d9711818c2630394c3967265ffed276bb25a55",
+      "bytes": 190
+    },
+    {
+      "path": "etc/preinit",
+      "mode": "100755",
+      "git_blob": "829574f5f1824fe207fba3d7cece2a391c9bc2a6",
+      "sha256": "7254c466bd5461af81010c0bd422bdde1464b862c640a9c81ec07eaab995dda2",
+      "bytes": 586
+    },
+    {
+      "path": "etc/profile",
+      "mode": "100644",
+      "git_blob": "0beff1608f607c7cd332024be89766ba3412f403",
+      "sha256": "e54cc63c8aad2a141c89c544c3f837fdc9f0d8ffa7a3bf44a6b0985404e935d8",
+      "bytes": 1023
+    },
+    {
+      "path": "etc/protocols",
+      "mode": "100644",
+      "git_blob": "26bc775ed68a6c1e0f00aaaa614fa1783e1fd351",
+      "sha256": "7d551355d5540b07b9d86e623cbbc4abecbb94d2a662b3afcc917940eb0e3d52",
+      "bytes": 2541
+    },
+    {
+      "path": "etc/rc.button/failsafe",
+      "mode": "100755",
+      "git_blob": "ba958fa885e0eb3f53498f0f9d90a8fbd7469c70",
+      "sha256": "e3be88fc5e21d138e0f8fe8f6eb74da2f3664c5d130f764e79f24f6909513048",
+      "bytes": 87
+    },
+    {
+      "path": "etc/rc.button/power",
+      "mode": "100755",
+      "git_blob": "c2457441728834e6fd8c2a34054fda95f31b78a3",
+      "sha256": "5e81f600a141e497058fdf1ccf3b619b74b19447302c41423234eb579527927b",
+      "bytes": 81
+    },
+    {
+      "path": "etc/rc.button/reboot",
+      "mode": "100755",
+      "git_blob": "cd547e33299b14aaf6814356a264a9fd74952bd1",
+      "sha256": "6423e1dc3179669ec513fe94db93aa08dfe186324f22705daaac7bba41a7d76c",
+      "bytes": 134
+    },
+    {
+      "path": "etc/rc.button/reset",
+      "mode": "100755",
+      "git_blob": "2403122ad21d1abd568337908c9d58060e87bf08",
+      "sha256": "f58a639fd649767572f345b628960d5694ff51cd4dc829474d2651ad63a51adb",
+      "bytes": 419
+    },
+    {
+      "path": "etc/rc.button/rfkill",
+      "mode": "100755",
+      "git_blob": "fbdda40ed56f3fd33f58895bf68be026b193ea13",
+      "sha256": "8e4f75daad6ae7fdfb99450d2317c8a36a5448c0bc3248afbe736eb4ba1ef5fa",
+      "bytes": 526
+    },
+    {
+      "path": "etc/rc.common",
+      "mode": "100755",
+      "git_blob": "5d0d3c23f7478653e6b301900b5c7742f74f1ca3",
+      "sha256": "ebeeedc132a75942ce876465e4636a75f745e468c573fdf9ad058e57e58a0341",
+      "bytes": 3233
+    },
+    {
+      "path": "etc/rc.local",
+      "mode": "100644",
+      "git_blob": "56394773c3e5aee85bd2dc8999433a7c9a9975b8",
+      "sha256": "515018aa94eb4937dade12dc0d69890b352af35a5ab5fb8203f9ed10990ac06f",
+      "bytes": 132
+    },
+    {
+      "path": "etc/services",
+      "mode": "100644",
+      "git_blob": "968f9e78be791760fb81a483c97dea943586486b",
+      "sha256": "754ccc71ca347bc79ac4c45139d416b7cf1e65a919dad1db15613a216cd6b9cc",
+      "bytes": 3073
+    },
+    {
+      "path": "etc/shadow",
+      "mode": "100644",
+      "git_blob": "4b4154f21f478cc025a350363b3e34319c6afacc",
+      "sha256": "ccbbfeee2dd560403fea13f7f431ebd21d9bb4b3d41e48e892013fa451f91cc4",
+      "bytes": 115
+    },
+    {
+      "path": "etc/shells",
+      "mode": "100644",
+      "git_blob": "006aa38ced919ceff440d83edfc69243551e3c1b",
+      "sha256": "8b35ce73c18161a7d7ed16fa244410993bd031515260e3e0c11749047df48d0a",
+      "bytes": 9
+    },
+    {
+      "path": "etc/shinit",
+      "mode": "100644",
+      "git_blob": "6b682d8769dfa78200bdc980fa746fe5f5bd204d",
+      "sha256": "7e7648d7bc6eb02fe0b24a87425d7d4ffc6600abd19f0954616662ce924f2446",
+      "bytes": 1120
+    },
+    {
+      "path": "etc/sysctl.conf",
+      "mode": "100644",
+      "git_blob": "ae04212f420b185ce525dae444b563128ddf0e11",
+      "sha256": "c02fe88dc055a1eaee9e7cb631760a3a5a9cea55610b42aa45196838c6f1a55e",
+      "bytes": 80
+    },
+    {
+      "path": "etc/sysctl.d/10-default.conf",
+      "mode": "100644",
+      "git_blob": "bc8c57969514e62f60b78ac13e58bc7f40012111",
+      "sha256": "824b1a4ddce0230d501fa245ab0035d8006b492ad9de1a951eea739254db3ea7",
+      "bytes": 702
+    },
+    {
+      "path": "etc/sysupgrade.conf",
+      "mode": "100644",
+      "git_blob": "e06fd5e3323d5e52b6d438dbd179007d09380fe1",
+      "sha256": "9e87b05fe2f12c84d1c465b396322748479f64bc40e5bab061887f0bd95020a6",
+      "bytes": 128
+    },
+    {
+      "path": "etc/uci-defaults/10_migrate-shadow",
+      "mode": "100644",
+      "git_blob": "481444f35eb6530074de872fd51ee38ab1036cf8",
+      "sha256": "2e15b0ec33535a6576e847de7185535aa8233b1f24b3ea2039c8cf2876b7db10",
+      "bytes": 395
+    },
+    {
+      "path": "etc/uci-defaults/12_network-generate-ula",
+      "mode": "100644",
+      "git_blob": "19d7ed7f2ea649cb6082d8806782a75132c5b197",
+      "sha256": "5e4794350c59ff46ccb4feaa85a6a5ff262ee04598767f783a2c57122b6e49c7",
+      "bytes": 369
+    },
+    {
+      "path": "etc/uci-defaults/13_fix-group-user",
+      "mode": "100644",
+      "git_blob": "74f501e8f77fcbe2c4a3a0143a1182d91971b0eb",
+      "sha256": "32092df897127daa528199c37750e7e29772e1a40ee34f525a2d879c86157732",
+      "bytes": 179
+    },
+    {
+      "path": "lib/functions.sh",
+      "mode": "100644",
+      "git_blob": "2bad45324f28548bab94550b12b38b51b1acc2da",
+      "sha256": "b2b07ca83222f8677f8117e4ed8bff162ef9e6ad0aadaa42d6248c5865831406",
+      "bytes": 8418
+    },
+    {
+      "path": "lib/functions/caldata.sh",
+      "mode": "100644",
+      "git_blob": "2177cf8415326e2906460c0a7229e9fa3b484889",
+      "sha256": "917beb4272755fa613c38494136d82148e2d7650c6ade34245f70a48a77e548c",
+      "bytes": 3869
+    },
+    {
+      "path": "lib/functions/leds.sh",
+      "mode": "100644",
+      "git_blob": "a7532faa2fd553f2ebc6555cad2001fc84297e6f",
+      "sha256": "3cb91b5f4e7b9572e0575bb773a875502f8ff9c18cb8a2cde17bb40c5fc25fea",
+      "bytes": 1832
+    },
+    {
+      "path": "lib/functions/migrations.sh",
+      "mode": "100644",
+      "git_blob": "d43ea35051ce5498147c4d58ae5dd43a5b84c36a",
+      "sha256": "b6f53a8b934ef1a559eeac599ed9de29a019897a5bce206f7183f752966bf478",
+      "bytes": 1456
+    },
+    {
+      "path": "lib/functions/network.sh",
+      "mode": "100644",
+      "git_blob": "055f18c11e0c5fd6c8f14bf9128c1f708da2bd9d",
+      "sha256": "83d48f03be77e57eb9ff1a044adf84847273375750eb6d94e9f906d5dd8c45d5",
+      "bytes": 8040
+    },
+    {
+      "path": "lib/functions/preinit.sh",
+      "mode": "100644",
+      "git_blob": "591e810af90d44ebac5149eea1c48dff231d2337",
+      "sha256": "1ccf53d231d142072efdb38935874b0785b2114cbf000c7b57e48a620857a225",
+      "bytes": 1812
+    },
+    {
+      "path": "lib/functions/service.sh",
+      "mode": "100644",
+      "git_blob": "3d08e1434dbe975ab229ead8b4f7f60a60536332",
+      "sha256": "afb750abd9c4b4eeb1e8dc5eb9f66c7d47774782494f2c168183390803db3b91",
+      "bytes": 2748
+    },
+    {
+      "path": "lib/functions/system.sh",
+      "mode": "100644",
+      "git_blob": "80e417182a269326e560524b4136def819703257",
+      "sha256": "6041a92a697af9e56cd73b957e858f889386ff22bcd8f563184cb07eddf8d0a6",
+      "bytes": 4322
+    },
+    {
+      "path": "lib/functions/uci-defaults.sh",
+      "mode": "100644",
+      "git_blob": "f96e645e73ccc4401115bd7b307e333730c396b9",
+      "sha256": "c5c6374dd54b67e56038dfc1a4af0c4eac73a9964d90d4a99600c1970b634a9b",
+      "bytes": 12890
+    },
+    {
+      "path": "lib/preinit/02_default_set_state",
+      "mode": "100644",
+      "git_blob": "28d5f1d9f940a6caeb90a41e71f649c3b4edd3be",
+      "sha256": "a8f3a0987269aa6ca04218a52c5cbf1f879017c9c7a17b293a08e9c9300f9c1e",
+      "bytes": 100
+    },
+    {
+      "path": "lib/preinit/02_sysinfo",
+      "mode": "100644",
+      "git_blob": "65b50968e2c42313f84f28e94b0b895fee06cf4f",
+      "sha256": "18e49aa9e39c97650a10f6009084d77391b36a371254fb45deed4429a8f5a5ce",
+      "bytes": 378
+    },
+    {
+      "path": "lib/preinit/10_indicate_failsafe",
+      "mode": "100644",
+      "git_blob": "7bf5e029e42ffaf9cce29924352d4b6faeb4e106",
+      "sha256": "6c15d9465b40c99dc90b6ef8d96e43cd405790c4d6184e0d74255441d83f4666",
+      "bytes": 389
+    },
+    {
+      "path": "lib/preinit/10_indicate_preinit",
+      "mode": "100644",
+      "git_blob": "deb5f2ae3a25b89c349d169903baec1369a12ef8",
+      "sha256": "3f9226047400d8673de00519d8a5ea4b2605ef434056864e42b8202fc74d8864",
+      "bytes": 3033
+    },
+    {
+      "path": "lib/preinit/30_failsafe_wait",
+      "mode": "100644",
+      "git_blob": "f90de71d40f2434acdecdfc568423f97abc29229",
+      "sha256": "0cf55fb8ce263e34cf9dd6208fe87c4a172ecf41de8d626af9aabd0bbf38ef18",
+      "bytes": 2508
+    },
+    {
+      "path": "lib/preinit/40_run_failsafe_hook",
+      "mode": "100644",
+      "git_blob": "e3f769a858413a9ab55d08da67055c9c31c4162c",
+      "sha256": "9ab044e0d5c2211da4a912f7e98f811992017f343c31678e20b1530a2404cee1",
+      "bytes": 370
+    },
+    {
+      "path": "lib/preinit/50_indicate_regular_preinit",
+      "mode": "100644",
+      "git_blob": "f4afcddb44b3fb5f00b5303380b6a61d684c44fe",
+      "sha256": "69e1044ab0ec91ca6a324b1943620e862d4c90de0ca9372c2ebd72afb2235e69",
+      "bytes": 244
+    },
+    {
+      "path": "lib/preinit/70_initramfs_test",
+      "mode": "100644",
+      "git_blob": "c5aae983c7300008bf10e605f1f3ae6a228f6057",
+      "sha256": "1533e5533b1a2a58de076144a82dd3c3cd6d9f07b5bdf96be92c6182676666e2",
+      "bytes": 233
+    },
+    {
+      "path": "lib/preinit/80_mount_root",
+      "mode": "100644",
+      "git_blob": "3f75411a4391c221d0fa00c7f1c0ef566642d14e",
+      "sha256": "d03c48d6a9499496873e970ed9aa2eb19847d6b356d1ee947c1c0ee7b64a4e65",
+      "bytes": 809
+    },
+    {
+      "path": "lib/preinit/99_10_failsafe_login",
+      "mode": "100644",
+      "git_blob": "1410c5f0db5fe3d673603ae2ee0e77c10c966986",
+      "sha256": "8fa5535708082749d979dee6622e30c55c85cf01a1ddca1760f893c84a49f76f",
+      "bytes": 437
+    },
+    {
+      "path": "lib/preinit/99_10_run_init",
+      "mode": "100644",
+      "git_blob": "ebf77b089680699a5a169e88ddffc7e775e6f86a",
+      "sha256": "5abe1789dc60a74c122495476f3ba2684ade29a9f28129788e266e7533ca0934",
+      "bytes": 152
+    },
+    {
+      "path": "lib/upgrade/common.sh",
+      "mode": "100644",
+      "git_blob": "13dbb7ab25d1e688563b1d0f031e73be26393787",
+      "sha256": "298cb8a9eb80f2632888811cef11eac6bbeb7b4151e656272c6acba2a827c4ad",
+      "bytes": 7232
+    },
+    {
+      "path": "lib/upgrade/do_stage2",
+      "mode": "100755",
+      "git_blob": "0e3244574353c8a5c25415ccb3a7a0b3530caca6",
+      "sha256": "b849b405446a5e6b1467d67bdd712e3ade9d215c78cf2bf80264914e21dfeed3",
+      "bytes": 451
+    },
+    {
+      "path": "lib/upgrade/fwtool.sh",
+      "mode": "100644",
+      "git_blob": "3826bf5c303ee07dfb383bf5f403cf3e869cbb92",
+      "sha256": "3090e58af54ef67cc0f9deab1a98f6f400c325d07d5df3d78c35ab4ec92b4d30",
+      "bytes": 2626
+    },
+    {
+      "path": "lib/upgrade/keep.d/base-files-essential",
+      "mode": "100644",
+      "git_blob": "7a7a2534663da48052b70d234504217ab4090f9a",
+      "sha256": "b4699e3ab61442aca541eaf3266b0be739a847db5c40e2b6a5c8bfbb0d52ccb6",
+      "bytes": 170
+    },
+    {
+      "path": "lib/upgrade/nand.sh",
+      "mode": "100644",
+      "git_blob": "e6f58df4f5aa016fc191b3858fdc5cd05d698810",
+      "sha256": "c39836efdb1ececd5b01732a0726e11ea93e9453dd69a1e22470e79e59daf95f",
+      "bytes": 7888
+    },
+    {
+      "path": "lib/upgrade/stage2",
+      "mode": "100755",
+      "git_blob": "23d356a447fa3b94c386e26792ecd3913a9bb6c0",
+      "sha256": "5a380e22e36e7bf3bebe835acc800b9ab447255943b63258031b4b85ad9e4000",
+      "bytes": 3134
+    },
+    {
+      "path": "rom/note",
+      "mode": "100644",
+      "git_blob": "1746eb050940b3305789acbdc00e103ba5cc9d3e",
+      "sha256": "6872a8f54e62acb5613a43feb95dbe9222436aadce6dc2e17f9fcfe69cca870e",
+      "bytes": 116
+    },
+    {
+      "path": "sbin/firstboot",
+      "mode": "100755",
+      "git_blob": "d9af57d59645bc44a5c8d789159eb7ea8b488c8d",
+      "sha256": "6cf5041c8b9e525a4e4344a55fe87db2765505e36b7ba2c63fdf15b184974e5c",
+      "bytes": 31
+    },
+    {
+      "path": "sbin/hotplug-call",
+      "mode": "100755",
+      "git_blob": "f595b9e75fa958ca6ade484134e625050bd8c7d5",
+      "sha256": "4cdc5b9683d615abd0be579fccbd3b8720b0bd57346e5fe45cea7a7a377845ff",
+      "bytes": 336
+    },
+    {
+      "path": "sbin/led.sh",
+      "mode": "100755",
+      "git_blob": "d750f06ea7909339d57b087b7d8003a763239bbd",
+      "sha256": "285fdf8391d36d7dad1e2b008d3e71ab464ffe839fc830428cffa1677065f4d0",
+      "bytes": 496
+    },
+    {
+      "path": "sbin/pkg_check",
+      "mode": "100755",
+      "git_blob": "28e87925aefd476dea7e3accfb0b23eed85eead2",
+      "sha256": "692db077c68645a825c48304f673c1bb4ed18e97ff151f2f224d797816d4d5e8",
+      "bytes": 3437
+    },
+    {
+      "path": "sbin/sysupgrade",
+      "mode": "100755",
+      "git_blob": "7e0a00e13b8ee4be7163936fd01a7beff0ce5c99",
+      "sha256": "639edd69a987c7b3d5604c67a174196e5c2c0e47cbb7a7bfd4027fcf08c24aa0",
+      "bytes": 10339
+    },
+    {
+      "path": "sbin/wifi",
+      "mode": "100755",
+      "git_blob": "6b9662fe93007b64fff5ddc8eaf42339ec459025",
+      "sha256": "2ec130f182afebd77c98a71859d6be7972e617723d6571e7a19cca7e49bb4801",
+      "bytes": 5046
+    },
+    {
+      "path": "usr/lib/os-release",
+      "mode": "100644",
+      "git_blob": "c39913d54fd3e15ee8a3b5804da84dda140428cd",
+      "sha256": "71e43d57ec2bfca73f87fc66845e05aaa8219f9ce1346caab34e70d354fa843a",
+      "bytes": 359
+    },
+    {
+      "path": "usr/libexec/login.sh",
+      "mode": "100755",
+      "git_blob": "1fff39c6a069e460dba75873218340e753ffaaff",
+      "sha256": "c159db82fb4c8a0c4c954539db114fbb693fdc3a9d9ef02a10823f67ab4a092c",
+      "bytes": 104
+    },
+    {
+      "path": "usr/libexec/validate_firmware_image",
+      "mode": "100755",
+      "git_blob": "f85fb9e4b4352022a6ddf108e9adabdb8f57ea71",
+      "sha256": "3aa49b4fd448efd7ff19cfc91cc419488d32efec59efee5bf3da39367fe40c91",
+      "bytes": 1565
+    }
+  ],
+  "license": "GPL-2.0",
+  "source_url": "https://github.com/openwrt/openwrt/tree/57a6d97ddf8f6541a52e0f8fad8c6f47685a1bc3/package/base-files/files"
+}

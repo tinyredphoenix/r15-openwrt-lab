@@ -25,6 +25,9 @@ def compact(source, output, run, commit):
             raise ValueError('Unsafe or duplicate checksum entry')
         expected[name] = digest
     selected = set(REQUIRED)
+    # New standard-boot foundation is optional so older runs remain exportable.
+    for name in ('openwrt-base-foundation.tar','openwrt-base-foundation.json'):
+        if (source / name).exists(): selected.add(name)
     selected.update(p.relative_to(source).as_posix() for p in (source / 'packages').glob('*.ipk'))
     selected.update(p.name for p in source.glob('*-version.txt'))
     if not any(name.startswith('packages/') for name in selected):
