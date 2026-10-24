@@ -90,6 +90,12 @@ if ! grep -qx 'source ".r15-userspace.in"' "$SDK/Config.in"; then
 fi
 cp "$ROOT/build/userspace.config" "$SDK/.config"
 make -C "$SDK" defconfig
+# Preserve SDK configuration evidence even when a capability assertion fails.
+mkdir -p "$ROOT/artifacts/config-audit"
+for name in Config.in Config-build.in .r15-userspace.in .config; do
+    if [[ -f "$SDK/$name" ]]; then cp "$SDK/$name" "$ROOT/artifacts/config-audit/$name"; fi
+done
+grep -E 'CONFIG_(R15_VENDOR_NAND|NAND_SUPPORT|PACKAGE_ubi-utils|FSTOOLS_UBIFS_EXTROOT)' "$SDK/.config" || true
 # The SDK defaults AUTOREMOVE=y, unlike the full OpenWrt build tree. It removes
 # compiled work after every package target, defeating incremental cache reuse.
 grep -qx '# CONFIG_AUTOREMOVE is not set' "$SDK/.config" || {

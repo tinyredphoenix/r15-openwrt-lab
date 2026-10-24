@@ -1,0 +1,1292 @@
+{
+  "scope": "Shipped R15 1.06.10 module DWARF baseline; matching layouts do not establish complete ABI/runtime compatibility",
+  "source_modules": [
+    {
+      "name": "cfg80211",
+      "sha256": "543c6305ee2fb4cdfdfd363ae3a6df46515b8cfafe66457ffde6e8c5e42d020f",
+      "vermagic": "4.4.140 SMP mod_unload MIPS32_R2 32BIT "
+    },
+    {
+      "name": "compat",
+      "sha256": "6d0deb13cbff3c1f88aa3eb31c389f099d2855d97d285b55c7b25df4a03282fd",
+      "vermagic": "4.4.140 SMP mod_unload MIPS32_R2 32BIT "
+    },
+    {
+      "name": "rtl8192cd",
+      "sha256": "7ff7da2a9b2117f7b42e990ae38201396db7f2fbd3a126ae4d80bd540e5ab235",
+      "vermagic": "4.4.140 SMP mod_unload MIPS32_R2 32BIT "
+    },
+    {
+      "name": "8852ae_98d",
+      "sha256": "dd5c92407ee6d6bee6d4958a1ed13898676063111497905b320d998767ff961f",
+      "vermagic": "4.4.140 SMP mod_unload MIPS32_R2 32BIT "
+    }
+  ],
+  "vermagic": "4.4.140 SMP mod_unload MIPS32_R2 32BIT ",
+  "types": {
+    "kstat": {
+      "bytes": 80,
+      "members": [
+        {
+          "name": "ino",
+          "offset": 0
+        },
+        {
+          "name": "dev",
+          "offset": 8
+        },
+        {
+          "name": "mode",
+          "offset": 12
+        },
+        {
+          "name": "nlink",
+          "offset": 16
+        },
+        {
+          "name": "uid",
+          "offset": 20
+        },
+        {
+          "name": "gid",
+          "offset": 24
+        },
+        {
+          "name": "rdev",
+          "offset": 28
+        },
+        {
+          "name": "size",
+          "offset": 32
+        },
+        {
+          "name": "atime",
+          "offset": 40
+        },
+        {
+          "name": "mtime",
+          "offset": 48
+        },
+        {
+          "name": "ctime",
+          "offset": 56
+        },
+        {
+          "name": "blksize",
+          "offset": 64
+        },
+        {
+          "name": "blocks",
+          "offset": 72
+        }
+      ]
+    },
+    "mutex": {
+      "bytes": 16,
+      "members": [
+        {
+          "name": "count",
+          "offset": 0
+        },
+        {
+          "name": "wait_lock",
+          "offset": 4
+        },
+        {
+          "name": "wait_list",
+          "offset": 8
+        }
+      ]
+    },
+    "cred": {
+      "bytes": 100,
+      "members": [
+        {
+          "name": "usage",
+          "offset": 0
+        },
+        {
+          "name": "uid",
+          "offset": 4
+        },
+        {
+          "name": "gid",
+          "offset": 8
+        },
+        {
+          "name": "suid",
+          "offset": 12
+        },
+        {
+          "name": "sgid",
+          "offset": 16
+        },
+        {
+          "name": "euid",
+          "offset": 20
+        },
+        {
+          "name": "egid",
+          "offset": 24
+        },
+        {
+          "name": "fsuid",
+          "offset": 28
+        },
+        {
+          "name": "fsgid",
+          "offset": 32
+        },
+        {
+          "name": "securebits",
+          "offset": 36
+        },
+        {
+          "name": "cap_inheritable",
+          "offset": 40
+        },
+        {
+          "name": "cap_permitted",
+          "offset": 48
+        },
+        {
+          "name": "cap_effective",
+          "offset": 56
+        },
+        {
+          "name": "cap_bset",
+          "offset": 64
+        },
+        {
+          "name": "cap_ambient",
+          "offset": 72
+        },
+        {
+          "name": "user",
+          "offset": 80
+        },
+        {
+          "name": "user_ns",
+          "offset": 84
+        },
+        {
+          "name": "group_info",
+          "offset": 88
+        },
+        {
+          "name": "rcu",
+          "offset": 92
+        }
+      ]
+    },
+    "qstr": {
+      "bytes": 16,
+      "members": [
+        {
+          "name": "<anonymous>",
+          "offset": 0
+        },
+        {
+          "name": "name",
+          "offset": 8
+        }
+      ]
+    },
+    "dentry": {
+      "bytes": 136,
+      "members": [
+        {
+          "name": "d_flags",
+          "offset": 0
+        },
+        {
+          "name": "d_seq",
+          "offset": 4
+        },
+        {
+          "name": "d_hash",
+          "offset": 8
+        },
+        {
+          "name": "d_parent",
+          "offset": 16
+        },
+        {
+          "name": "d_name",
+          "offset": 24
+        },
+        {
+          "name": "d_inode",
+          "offset": 40
+        },
+        {
+          "name": "d_iname",
+          "offset": 44
+        },
+        {
+          "name": "d_lockref",
+          "offset": 80
+        },
+        {
+          "name": "d_op",
+          "offset": 88
+        },
+        {
+          "name": "d_sb",
+          "offset": 92
+        },
+        {
+          "name": "d_time",
+          "offset": 96
+        },
+        {
+          "name": "d_fsdata",
+          "offset": 100
+        },
+        {
+          "name": "d_lru",
+          "offset": 104
+        },
+        {
+          "name": "d_child",
+          "offset": 112
+        },
+        {
+          "name": "d_subdirs",
+          "offset": 120
+        },
+        {
+          "name": "d_u",
+          "offset": 128
+        }
+      ]
+    },
+    "inode": {
+      "bytes": 304,
+      "members": [
+        {
+          "name": "i_mode",
+          "offset": 0
+        },
+        {
+          "name": "i_opflags",
+          "offset": 2
+        },
+        {
+          "name": "i_uid",
+          "offset": 4
+        },
+        {
+          "name": "i_gid",
+          "offset": 8
+        },
+        {
+          "name": "i_flags",
+          "offset": 12
+        },
+        {
+          "name": "i_acl",
+          "offset": 16
+        },
+        {
+          "name": "i_default_acl",
+          "offset": 20
+        },
+        {
+          "name": "i_op",
+          "offset": 24
+        },
+        {
+          "name": "i_sb",
+          "offset": 28
+        },
+        {
+          "name": "i_mapping",
+          "offset": 32
+        },
+        {
+          "name": "i_ino",
+          "offset": 36
+        },
+        {
+          "name": "<anonymous>",
+          "offset": 40
+        },
+        {
+          "name": "i_rdev",
+          "offset": 44
+        },
+        {
+          "name": "i_size",
+          "offset": 48
+        },
+        {
+          "name": "i_atime",
+          "offset": 56
+        },
+        {
+          "name": "i_mtime",
+          "offset": 64
+        },
+        {
+          "name": "i_ctime",
+          "offset": 72
+        },
+        {
+          "name": "i_lock",
+          "offset": 80
+        },
+        {
+          "name": "i_bytes",
+          "offset": 84
+        },
+        {
+          "name": "i_blkbits",
+          "offset": 88
+        },
+        {
+          "name": "i_blocks",
+          "offset": 92
+        },
+        {
+          "name": "i_size_seqcount",
+          "offset": 96
+        },
+        {
+          "name": "i_state",
+          "offset": 100
+        },
+        {
+          "name": "i_mutex",
+          "offset": 104
+        },
+        {
+          "name": "dirtied_when",
+          "offset": 120
+        },
+        {
+          "name": "dirtied_time_when",
+          "offset": 124
+        },
+        {
+          "name": "i_hash",
+          "offset": 128
+        },
+        {
+          "name": "i_io_list",
+          "offset": 136
+        },
+        {
+          "name": "i_lru",
+          "offset": 144
+        },
+        {
+          "name": "i_sb_list",
+          "offset": 152
+        },
+        {
+          "name": "<anonymous>",
+          "offset": 160
+        },
+        {
+          "name": "i_version",
+          "offset": 168
+        },
+        {
+          "name": "i_count",
+          "offset": 176
+        },
+        {
+          "name": "i_dio_count",
+          "offset": 180
+        },
+        {
+          "name": "i_writecount",
+          "offset": 184
+        },
+        {
+          "name": "i_fop",
+          "offset": 188
+        },
+        {
+          "name": "i_flctx",
+          "offset": 192
+        },
+        {
+          "name": "i_data",
+          "offset": 196
+        },
+        {
+          "name": "i_devices",
+          "offset": 276
+        },
+        {
+          "name": "<anonymous>",
+          "offset": 284
+        },
+        {
+          "name": "i_generation",
+          "offset": 288
+        },
+        {
+          "name": "i_fsnotify_mask",
+          "offset": 292
+        },
+        {
+          "name": "i_fsnotify_marks",
+          "offset": 296
+        },
+        {
+          "name": "i_private",
+          "offset": 300
+        }
+      ]
+    },
+    "dentry_operations": {
+      "bytes": 64,
+      "members": [
+        {
+          "name": "d_revalidate",
+          "offset": 0
+        },
+        {
+          "name": "d_weak_revalidate",
+          "offset": 4
+        },
+        {
+          "name": "d_hash",
+          "offset": 8
+        },
+        {
+          "name": "d_compare",
+          "offset": 12
+        },
+        {
+          "name": "d_delete",
+          "offset": 16
+        },
+        {
+          "name": "d_release",
+          "offset": 20
+        },
+        {
+          "name": "d_prune",
+          "offset": 24
+        },
+        {
+          "name": "d_iput",
+          "offset": 28
+        },
+        {
+          "name": "d_dname",
+          "offset": 32
+        },
+        {
+          "name": "d_automount",
+          "offset": 36
+        },
+        {
+          "name": "d_manage",
+          "offset": 40
+        },
+        {
+          "name": "d_select_inode",
+          "offset": 44
+        },
+        {
+          "name": "d_real",
+          "offset": 48
+        }
+      ]
+    },
+    "super_block": {
+      "bytes": 896,
+      "members": [
+        {
+          "name": "s_list",
+          "offset": 0
+        },
+        {
+          "name": "s_dev",
+          "offset": 8
+        },
+        {
+          "name": "s_blocksize_bits",
+          "offset": 12
+        },
+        {
+          "name": "s_blocksize",
+          "offset": 16
+        },
+        {
+          "name": "s_maxbytes",
+          "offset": 24
+        },
+        {
+          "name": "s_type",
+          "offset": 32
+        },
+        {
+          "name": "s_op",
+          "offset": 36
+        },
+        {
+          "name": "dq_op",
+          "offset": 40
+        },
+        {
+          "name": "s_qcop",
+          "offset": 44
+        },
+        {
+          "name": "s_export_op",
+          "offset": 48
+        },
+        {
+          "name": "s_flags",
+          "offset": 52
+        },
+        {
+          "name": "s_iflags",
+          "offset": 56
+        },
+        {
+          "name": "s_magic",
+          "offset": 60
+        },
+        {
+          "name": "s_root",
+          "offset": 64
+        },
+        {
+          "name": "s_umount",
+          "offset": 68
+        },
+        {
+          "name": "s_count",
+          "offset": 84
+        },
+        {
+          "name": "s_active",
+          "offset": 88
+        },
+        {
+          "name": "s_xattr",
+          "offset": 92
+        },
+        {
+          "name": "s_anon",
+          "offset": 96
+        },
+        {
+          "name": "s_mounts",
+          "offset": 100
+        },
+        {
+          "name": "s_bdev",
+          "offset": 108
+        },
+        {
+          "name": "s_bdi",
+          "offset": 112
+        },
+        {
+          "name": "s_mtd",
+          "offset": 116
+        },
+        {
+          "name": "s_instances",
+          "offset": 120
+        },
+        {
+          "name": "s_quota_types",
+          "offset": 128
+        },
+        {
+          "name": "s_dquot",
+          "offset": 136
+        },
+        {
+          "name": "s_writers",
+          "offset": 368
+        },
+        {
+          "name": "s_id",
+          "offset": 600
+        },
+        {
+          "name": "s_uuid",
+          "offset": 632
+        },
+        {
+          "name": "s_fs_info",
+          "offset": 648
+        },
+        {
+          "name": "s_max_links",
+          "offset": 652
+        },
+        {
+          "name": "s_mode",
+          "offset": 656
+        },
+        {
+          "name": "s_time_gran",
+          "offset": 660
+        },
+        {
+          "name": "s_vfs_rename_mutex",
+          "offset": 664
+        },
+        {
+          "name": "s_subtype",
+          "offset": 680
+        },
+        {
+          "name": "s_options",
+          "offset": 684
+        },
+        {
+          "name": "s_d_op",
+          "offset": 688
+        },
+        {
+          "name": "cleancache_poolid",
+          "offset": 692
+        },
+        {
+          "name": "s_shrink",
+          "offset": 696
+        },
+        {
+          "name": "s_remove_count",
+          "offset": 728
+        },
+        {
+          "name": "s_readonly_remount",
+          "offset": 732
+        },
+        {
+          "name": "s_dio_done_wq",
+          "offset": 736
+        },
+        {
+          "name": "s_pins",
+          "offset": 740
+        },
+        {
+          "name": "s_dentry_lru",
+          "offset": 768
+        },
+        {
+          "name": "s_inode_lru",
+          "offset": 800
+        },
+        {
+          "name": "rcu",
+          "offset": 804
+        },
+        {
+          "name": "destroy_work",
+          "offset": 812
+        },
+        {
+          "name": "s_sync_lock",
+          "offset": 828
+        },
+        {
+          "name": "s_stack_depth",
+          "offset": 844
+        },
+        {
+          "name": "s_inode_list_lock",
+          "offset": 864
+        },
+        {
+          "name": "s_inodes",
+          "offset": 868
+        }
+      ]
+    },
+    "path": {
+      "bytes": 8,
+      "members": [
+        {
+          "name": "mnt",
+          "offset": 0
+        },
+        {
+          "name": "dentry",
+          "offset": 4
+        }
+      ]
+    },
+    "iattr": {
+      "bytes": 56,
+      "members": [
+        {
+          "name": "ia_valid",
+          "offset": 0
+        },
+        {
+          "name": "ia_mode",
+          "offset": 4
+        },
+        {
+          "name": "ia_uid",
+          "offset": 8
+        },
+        {
+          "name": "ia_gid",
+          "offset": 12
+        },
+        {
+          "name": "ia_size",
+          "offset": 16
+        },
+        {
+          "name": "ia_atime",
+          "offset": 24
+        },
+        {
+          "name": "ia_mtime",
+          "offset": 32
+        },
+        {
+          "name": "ia_ctime",
+          "offset": 40
+        },
+        {
+          "name": "ia_file",
+          "offset": 48
+        }
+      ]
+    },
+    "file": {
+      "bytes": 160,
+      "members": [
+        {
+          "name": "f_u",
+          "offset": 0
+        },
+        {
+          "name": "f_path",
+          "offset": 8
+        },
+        {
+          "name": "f_inode",
+          "offset": 16
+        },
+        {
+          "name": "f_op",
+          "offset": 20
+        },
+        {
+          "name": "f_lock",
+          "offset": 24
+        },
+        {
+          "name": "f_count",
+          "offset": 28
+        },
+        {
+          "name": "f_flags",
+          "offset": 32
+        },
+        {
+          "name": "f_mode",
+          "offset": 36
+        },
+        {
+          "name": "f_pos_lock",
+          "offset": 40
+        },
+        {
+          "name": "f_pos",
+          "offset": 56
+        },
+        {
+          "name": "f_owner",
+          "offset": 64
+        },
+        {
+          "name": "f_cred",
+          "offset": 88
+        },
+        {
+          "name": "f_ra",
+          "offset": 96
+        },
+        {
+          "name": "f_version",
+          "offset": 128
+        },
+        {
+          "name": "private_data",
+          "offset": 136
+        },
+        {
+          "name": "f_ep_links",
+          "offset": 140
+        },
+        {
+          "name": "f_tfile_llink",
+          "offset": 148
+        },
+        {
+          "name": "f_mapping",
+          "offset": 156
+        }
+      ]
+    },
+    "address_space": {
+      "bytes": 80,
+      "members": [
+        {
+          "name": "host",
+          "offset": 0
+        },
+        {
+          "name": "page_tree",
+          "offset": 4
+        },
+        {
+          "name": "tree_lock",
+          "offset": 16
+        },
+        {
+          "name": "i_mmap_writable",
+          "offset": 20
+        },
+        {
+          "name": "i_mmap",
+          "offset": 24
+        },
+        {
+          "name": "i_mmap_rwsem",
+          "offset": 28
+        },
+        {
+          "name": "nrpages",
+          "offset": 44
+        },
+        {
+          "name": "nrshadows",
+          "offset": 48
+        },
+        {
+          "name": "writeback_index",
+          "offset": 52
+        },
+        {
+          "name": "a_ops",
+          "offset": 56
+        },
+        {
+          "name": "flags",
+          "offset": 60
+        },
+        {
+          "name": "private_lock",
+          "offset": 64
+        },
+        {
+          "name": "private_list",
+          "offset": 68
+        },
+        {
+          "name": "private_data",
+          "offset": 76
+        }
+      ]
+    },
+    "inode_operations": {
+      "bytes": 128,
+      "members": [
+        {
+          "name": "lookup",
+          "offset": 0
+        },
+        {
+          "name": "follow_link",
+          "offset": 4
+        },
+        {
+          "name": "permission",
+          "offset": 8
+        },
+        {
+          "name": "get_acl",
+          "offset": 12
+        },
+        {
+          "name": "readlink",
+          "offset": 16
+        },
+        {
+          "name": "put_link",
+          "offset": 20
+        },
+        {
+          "name": "create",
+          "offset": 24
+        },
+        {
+          "name": "link",
+          "offset": 28
+        },
+        {
+          "name": "unlink",
+          "offset": 32
+        },
+        {
+          "name": "symlink",
+          "offset": 36
+        },
+        {
+          "name": "mkdir",
+          "offset": 40
+        },
+        {
+          "name": "rmdir",
+          "offset": 44
+        },
+        {
+          "name": "mknod",
+          "offset": 48
+        },
+        {
+          "name": "rename",
+          "offset": 52
+        },
+        {
+          "name": "rename2",
+          "offset": 56
+        },
+        {
+          "name": "setattr",
+          "offset": 60
+        },
+        {
+          "name": "getattr",
+          "offset": 64
+        },
+        {
+          "name": "setxattr",
+          "offset": 68
+        },
+        {
+          "name": "getxattr",
+          "offset": 72
+        },
+        {
+          "name": "listxattr",
+          "offset": 76
+        },
+        {
+          "name": "removexattr",
+          "offset": 80
+        },
+        {
+          "name": "fiemap",
+          "offset": 84
+        },
+        {
+          "name": "update_time",
+          "offset": 88
+        },
+        {
+          "name": "atomic_open",
+          "offset": 92
+        },
+        {
+          "name": "tmpfile",
+          "offset": 96
+        },
+        {
+          "name": "set_acl",
+          "offset": 100
+        }
+      ]
+    },
+    "file_operations": {
+      "bytes": 108,
+      "members": [
+        {
+          "name": "owner",
+          "offset": 0
+        },
+        {
+          "name": "llseek",
+          "offset": 4
+        },
+        {
+          "name": "read",
+          "offset": 8
+        },
+        {
+          "name": "write",
+          "offset": 12
+        },
+        {
+          "name": "read_iter",
+          "offset": 16
+        },
+        {
+          "name": "write_iter",
+          "offset": 20
+        },
+        {
+          "name": "iterate",
+          "offset": 24
+        },
+        {
+          "name": "poll",
+          "offset": 28
+        },
+        {
+          "name": "unlocked_ioctl",
+          "offset": 32
+        },
+        {
+          "name": "compat_ioctl",
+          "offset": 36
+        },
+        {
+          "name": "mmap",
+          "offset": 40
+        },
+        {
+          "name": "open",
+          "offset": 44
+        },
+        {
+          "name": "flush",
+          "offset": 48
+        },
+        {
+          "name": "release",
+          "offset": 52
+        },
+        {
+          "name": "fsync",
+          "offset": 56
+        },
+        {
+          "name": "aio_fsync",
+          "offset": 60
+        },
+        {
+          "name": "fasync",
+          "offset": 64
+        },
+        {
+          "name": "lock",
+          "offset": 68
+        },
+        {
+          "name": "sendpage",
+          "offset": 72
+        },
+        {
+          "name": "get_unmapped_area",
+          "offset": 76
+        },
+        {
+          "name": "check_flags",
+          "offset": 80
+        },
+        {
+          "name": "flock",
+          "offset": 84
+        },
+        {
+          "name": "splice_write",
+          "offset": 88
+        },
+        {
+          "name": "splice_read",
+          "offset": 92
+        },
+        {
+          "name": "setlease",
+          "offset": 96
+        },
+        {
+          "name": "fallocate",
+          "offset": 100
+        },
+        {
+          "name": "show_fdinfo",
+          "offset": 104
+        }
+      ]
+    },
+    "super_operations": {
+      "bytes": 88,
+      "members": [
+        {
+          "name": "alloc_inode",
+          "offset": 0
+        },
+        {
+          "name": "destroy_inode",
+          "offset": 4
+        },
+        {
+          "name": "dirty_inode",
+          "offset": 8
+        },
+        {
+          "name": "write_inode",
+          "offset": 12
+        },
+        {
+          "name": "drop_inode",
+          "offset": 16
+        },
+        {
+          "name": "evict_inode",
+          "offset": 20
+        },
+        {
+          "name": "put_super",
+          "offset": 24
+        },
+        {
+          "name": "sync_fs",
+          "offset": 28
+        },
+        {
+          "name": "freeze_super",
+          "offset": 32
+        },
+        {
+          "name": "freeze_fs",
+          "offset": 36
+        },
+        {
+          "name": "thaw_super",
+          "offset": 40
+        },
+        {
+          "name": "unfreeze_fs",
+          "offset": 44
+        },
+        {
+          "name": "statfs",
+          "offset": 48
+        },
+        {
+          "name": "remount_fs",
+          "offset": 52
+        },
+        {
+          "name": "umount_begin",
+          "offset": 56
+        },
+        {
+          "name": "show_options",
+          "offset": 60
+        },
+        {
+          "name": "show_devname",
+          "offset": 64
+        },
+        {
+          "name": "show_path",
+          "offset": 68
+        },
+        {
+          "name": "show_stats",
+          "offset": 72
+        },
+        {
+          "name": "bdev_try_to_free_page",
+          "offset": 76
+        },
+        {
+          "name": "nr_cached_objects",
+          "offset": 80
+        },
+        {
+          "name": "free_cached_objects",
+          "offset": 84
+        }
+      ]
+    },
+    "vm_area_struct": {
+      "bytes": 88,
+      "members": [
+        {
+          "name": "vm_start",
+          "offset": 0
+        },
+        {
+          "name": "vm_end",
+          "offset": 4
+        },
+        {
+          "name": "vm_next",
+          "offset": 8
+        },
+        {
+          "name": "vm_prev",
+          "offset": 12
+        },
+        {
+          "name": "vm_rb",
+          "offset": 16
+        },
+        {
+          "name": "rb_subtree_gap",
+          "offset": 28
+        },
+        {
+          "name": "vm_mm",
+          "offset": 32
+        },
+        {
+          "name": "vm_page_prot",
+          "offset": 36
+        },
+        {
+          "name": "vm_flags",
+          "offset": 40
+        },
+        {
+          "name": "shared",
+          "offset": 44
+        },
+        {
+          "name": "anon_vma_chain",
+          "offset": 60
+        },
+        {
+          "name": "anon_vma",
+          "offset": 68
+        },
+        {
+          "name": "vm_ops",
+          "offset": 72
+        },
+        {
+          "name": "vm_pgoff",
+          "offset": 76
+        },
+        {
+          "name": "vm_file",
+          "offset": 80
+        },
+        {
+          "name": "vm_private_data",
+          "offset": 84
+        },
+        {
+          "name": "vm_userfaultfd_ctx",
+          "offset": 88
+        }
+      ]
+    }
+  }
+}
