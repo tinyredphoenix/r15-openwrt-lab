@@ -121,5 +121,11 @@ while [ "$DURATION" = 0 ] || [ "$n" -lt "$DURATION" ]; do
     # Maintain our alias and return route without changing bridge membership.
     ensure_management || event management-address-pending
     while read -r role pid born; do owned "$pid" "$born" || exit 119; done < "$LOG/owned.tsv"
+    if [ -n "$NETWORK_PID" ] && [ "$(starttime "$NETWORK_PID")" != "$NETWORK_BIRTH" ]; then
+        wait "$NETWORK_PID"; network_rc=$?
+        printf '%s\n' "$network_rc" > "$BASE/network-exit"
+        event "network-handoff-exited:$network_rc"
+        NETWORK_PID=
+    fi
     sleep 2; n=$((n+2))
 done

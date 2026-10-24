@@ -15,6 +15,7 @@ case "$DURATION" in ''|*[!0-9]*) exit 90 ;; esac
 [ "$DURATION" -le 3600 ] || exit 90
 [ -d "$BASE/inputs" ] && [ ! -e "$LOG" ] || exit 91
 [ "$(cat "$BASE/boot-id.expected")" = "$(cat /proc/sys/kernel/random/boot_id)" ] || exit 92
+trap 'early_rc=$?; printf "%s\n" "$early_rc" > "$BASE/early-result"' 0
 [ -s /run/r15-management/logs/owned.tsv ] || exit 93
 . "$ROOT/usr/libexec/r15-session-lifecycle.sh"
 while read -r role pid born; do owned "$pid" "$born" || exit 94; done < /run/r15-management/logs/owned.tsv
@@ -22,20 +23,26 @@ while read -r role pid born; do owned "$pid" "$born" || exit 94; done < /run/r15
 mkdir -m 700 "$BASE/pipes" || exit 96
 [ -f "$BASE/inputs/r15_radio" ] || exit 97
 ip -4 addr show dev br0 | grep -q 'inet 192.168.77.1/24' || exit 98
-[ -z "$(ip -4 addr show dev ${STA} | grep 'inet ')" ] || exit 98
 # HTTP may become ready before stock radio startup has finished replacing PIDs.
 attempt=0
-while [ "$attempt" -lt 10 ]; do
+while [ "$attempt" -lt 120 ]; do
     APID=$(cat /var/run/hapd_${RADIO}_pid.pid 2>/dev/null)
     SPID=$(cat /var/run/wpas_${RADIO}_vxd_pid.pid 2>/dev/null)
     case "$APID:$SPID" in *[!0-9:]*|:*|*:) ;; *)
         if [ "$APID" -gt 1 ] && [ "$SPID" -gt 1 ] &&
            [ "$(readlink /proc/$APID/exe)" = /usr/bin/hostapd ] &&
-           [ "$(readlink /proc/$SPID/exe)" = /usr/bin/wpa_supplicant ]; then break; fi
+           [ "$(readlink /proc/$SPID/exe)" = /usr/bin/wpa_supplicant ] &&
+           [ -d "/sys/class/net/$RADIO" ] && [ -d "/sys/class/net/$STA" ]; then
+            hostapd_cli -p /var/run/hostapd -i "$RADIO" status > "$BASE/stock-ready.txt" 2>&1
+            if grep -q '^state=ENABLED$' "$BASE/stock-ready.txt"; then break; fi
+        fi
         ;;
     esac
     sleep 1; attempt=$((attempt+1))
 done
+[ "$attempt" -lt 120 ] || exit 177
+[ -d "/sys/class/net/$RADIO" ] && [ -d "/sys/class/net/$STA" ] || exit 178
+[ -z "$(ip -4 addr show dev "$STA" | grep 'inet ')" ] || exit 98
 case "$APID:$SPID" in *[!0-9:]*|:*|*:) exit 99 ;; esac
 [ "$APID" -gt 1 ] && [ "$SPID" -gt 1 ] || exit 99
 [ "$(readlink /proc/$APID/exe)" = /usr/bin/hostapd ] || exit 100

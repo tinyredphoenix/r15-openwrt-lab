@@ -45,6 +45,28 @@ ALIGN_OK=1; REJOIN_OK=1; LEASE=1; PROBE_OK=1; SUBNET_OK=1
             self.assertEqual(r.returncode,0,r.stderr)
             return calls.read_text().splitlines(),r.stdout.splitlines()
 
+    def test_initial_scan_config_disables_association_without_changing_source(self):
+        calls,out=self.scenario('''CONFIGDIR=${CALLS%/*}; SCANCONF=$CONFIGDIR/start.conf
+printf 'ctrl_interface=/var/run/r15-wpa\\nnetwork={\\nssid=74657374\\n}\\n' > "$CONFIGDIR/wpa_supplicant.conf"
+prepare_scan_config || exit 1
+grep '^disabled=' "$CONFIGDIR/wpa_supplicant.conf" && exit 1
+sed -n '/disabled=/p' "$SCANCONF"''',adapters='')
+        self.assertEqual(out,['\tdisabled=1'])
+
+    def test_initial_pair_enables_association_only_after_scan_and_aligned_ap(self):
+        adapters=ADAPTERS+'''
+prepare_scan_config() { echo DISABLED_CONFIG >> "$CALLS"; }
+wpa_supplicant() { :; }
+kill() { return 0; }
+select_scan_frequency() { echo FRESH_SCAN >> "$CALLS"; SCANFREQ=5200; }
+align_ap() { echo "ALIGN $1" >> "$CALLS"; TEST_AP_FREQ=$1; }
+start_ap() { echo START_AP >> "$CALLS"; APCHILD=123; }
+read_ap() { AFREQ=${TEST_AP_FREQ:-5180}; echo "AP_ENABLED $AFREQ" >> "$CALLS"; APSTATE=ENABLED; }
+wcli() { echo "WCLI $*" >> "$CALLS"; echo OK; }
+'''
+        calls,out=self.scenario('start_aligned_pair',adapters=adapters)
+        self.assertEqual(calls,['DISABLED_CONFIG','START_AP','SCAN','FRESH_SCAN','AP_ENABLED 5180','ALIGN 5200','AP_ENABLED 5200','WCLI enable_network 0'])
+
     def test_ap_channel_failure_requires_rejoin_and_carrier_before_ready(self):
         calls,out=self.scenario('''ATTACHED=1; TAFREQ=2452; coordinate_tick; echo "$READY"
 TAFREQ=2412; TCARRIER=0; coordinate_tick; echo "$READY"
