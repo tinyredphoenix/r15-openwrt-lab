@@ -105,6 +105,12 @@ echo "ready:$READY"
     checks['radio_coordinator_target_policy'] = 'pass; target ash with shell-only fake adapters'
     invoke(root, 'bin/busybox', ['ash', '-n', repository / 'prototype/runtime/r15-health'])
     checks['health_probe_busybox_syntax'] = 'pass'
+    # Unknown option returns usage before logging, setsid, uloop or ubus setup.
+    supervisor_help = invoke(root, 'sbin/procd', ['-Z'], accepted=(1,))
+    if 'Usage:' not in supervisor_help.stderr:
+        raise RuntimeError('procd early-exit usage check failed')
+    checks['procd_early_usage_only'] = 'pass; no supervisor or ubus system methods started'
+    checks['procd_non_pid1_system_api_hardware_tested'] = False
     helpers = json.loads((repository / 'build/common-runtime-manifest.json').read_text())
     for record in helpers['files']:
         invoke(root, 'bin/busybox', ['ash', '-n', root / record['path']])

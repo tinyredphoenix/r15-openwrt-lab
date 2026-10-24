@@ -43,6 +43,13 @@ if ! cmp -s "$ROOT/patches/900-rtl8192cd-sta-assoc-reply.patch" "$PATCH_TARGET";
     cp "$ROOT/patches/900-rtl8192cd-sta-assoc-reply.patch" "$PATCH_TARGET"
     PATCH_CHANGED=1
 fi
+PROCD_PATCH_CHANGED=0
+PROCD_PATCH_TARGET="$SDK/package/system/procd/patches/900-r15-nonpid1-system-api.patch"
+mkdir -p "${PROCD_PATCH_TARGET%/*}"
+if ! cmp -s "$ROOT/patches/900-r15-nonpid1-system-api.patch" "$PROCD_PATCH_TARGET"; then
+    cp "$ROOT/patches/900-r15-nonpid1-system-api.patch" "$PROCD_PATCH_TARGET"
+    PROCD_PATCH_CHANGED=1
+fi
 # Pin LuCI separately; src-link keeps feeds metadata local after checkout.
 LUCI_SOURCE="$CACHE/luci-$LUCI_COMMIT"
 if [[ ! -d "$LUCI_SOURCE/.git" ]]; then
@@ -77,11 +84,16 @@ for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
     CONFIG_PACKAGE_firewall=y CONFIG_PACKAGE_iptables=y CONFIG_PACKAGE_ip6tables=y \
     CONFIG_PACKAGE_luci=y CONFIG_PACKAGE_ppp=y CONFIG_PACKAGE_ppp-mod-pppoe=y \
     CONFIG_PACKAGE_uhttpd=y CONFIG_PACKAGE_rpcd=y CONFIG_PACKAGE_libustream-openssl=y \
-    CONFIG_PACKAGE_cgi-io=y CONFIG_PACKAGE_luci-compat=y \
+    CONFIG_PACKAGE_cgi-io=y CONFIG_PACKAGE_luci-compat=y CONFIG_PACKAGE_libuci-lua=y \
     CONFIG_PACKAGE_luci-lib-nixio_openssl=y; do
     grep -qx "$symbol" "$SDK/.config" || { echo "Missing build setting: $symbol" >&2; exit 1; }
 done
 python3 "$ROOT/build/selected-recipes.py" "$SDK" > "$ROOT/artifacts/selected-recipes.txt"
+cp "$SDK/.config" "$ROOT/artifacts/sdk.config"
+cp "$ROOT/build/pins.env" "$ROOT/artifacts/pins.env"
+printf 'Selected userspace recipes: '
+wc -l < "$ROOT/artifacts/selected-recipes.txt"
+cat "$ROOT/artifacts/selected-recipes.txt"
 # Invalidate wpad only when the added patch changes. OpenWrt tracks configuration
 # changes itself; the artifact collector independently checks the compiled marker.
 if [[ "$PATCH_CHANGED" == 1 ]]; then
@@ -90,15 +102,10 @@ fi
 if [[ "$NIXIO_CHANGED" == 1 ]]; then
     make -C "$SDK" package/feeds/luci/luci-lib-nixio/clean
 fi
+if [[ "$PROCD_PATCH_CHANGED" == 1 ]]; then
+    make -C "$SDK" package/system/procd/clean
+fi
 make -C "$SDK" package/toolchain/compile -j2 V=s
-make -C "$SDK" package/network/services/hostapd/compile -j2 V=s
-for package in utils/busybox system/procd system/ubox system/ubus system/uci \
-    network/config/netifd network/services/dropbear network/services/dnsmasq \
-    utils/jsonfilter network/utils/iptables network/config/firewall \
-    network/services/ppp network/services/uhttpd system/rpcd; do
-    make -C "$SDK" "package/$package/compile" -j2 V=s
-done
-make -C "$SDK" package/feeds/luci/luci/compile -j2 V=s
 # Build selected userspace runtime recipes, including cgi-io. A global
 # package/compile also builds unrelated SDK board/signing and kernel recipes.
 # The IPK collector below independently rejects incomplete runtime closure.

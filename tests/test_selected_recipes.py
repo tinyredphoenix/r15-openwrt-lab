@@ -37,3 +37,7 @@ Package: ignored
     def test_ambiguous_recipe_rejected(self):
         with self.assertRaises(ValueError):
             m.recipes(CONFIG,BASE+'Source-Makefile: package/other/Makefile\nPackage: luci\n')
+
+    def test_sdk_optional_modules_are_not_selected_for_runtime_build(self):
+        info=BASE+'Source-Makefile: package/optional/Makefile\nPackage: optional\n'
+        self.assertNotIn('package/optional/compile',m.recipes(CONFIG+'CONFIG_PACKAGE_optional=m\n',info))

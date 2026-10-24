@@ -1,0 +1,28 @@
+--- a/system.c
++++ b/system.c
+@@ -734,6 +734,12 @@
+ 	UBUS_METHOD("sysupgrade", sysupgrade, sysupgrade_policy),
+ };
+ 
++/* A RAM-only service supervisor must not control the host's boot lifecycle. */
++static const struct ubus_method system_readonly_methods[] = {
++	UBUS_METHOD_NOARG("board", system_board),
++	UBUS_METHOD_NOARG("info", system_info),
++};
++
+ static struct ubus_object_type system_object_type =
+ 	UBUS_OBJECT_TYPE("system", system_methods);
+ 
+@@ -768,6 +774,12 @@
+ 	if (initramfs)
+ 		unsetenv("INITRAMFS");
+ 
++	if (getpid() != 1) {
++		system_object.methods = system_readonly_methods;
++		system_object.n_methods = ARRAY_SIZE(system_readonly_methods);
++		DEBUG(1, "R15 service-only supervisor: read-only system API\n");
++	}
++
+ 	ret = ubus_add_object(ctx, &system_object);
+ 	if (ret)
+ 		ERROR("Failed to add object: %s\n", ubus_strerror(ret));

@@ -14,7 +14,7 @@ import tarfile
 ROOT_PACKAGES = ['wpad-basic', 'wpa-cli', 'hostapd-utils', 'busybox', 'procd',
                  'ubox', 'logd', 'ubus', 'ubusd', 'uci', 'netifd', 'dropbear',
                  'dnsmasq', 'jsonfilter', 'firewall', 'iptables', 'ip6tables',
-                 'luci', 'luci-compat', 'ppp', 'ppp-mod-pppoe', 'libustream-openssl', 'openssl-util']
+                 'luci', 'luci-compat', 'libuci-lua', 'ppp', 'ppp-mod-pppoe', 'libustream-openssl', 'openssl-util']
 
 def safe_path(root, name):
     path = PurePosixPath(name)
@@ -205,6 +205,8 @@ def collect(sdk, output):
     wpad = root / 'usr/sbin/wpad'
     if b'rtl8192cd assoc-resp offload' not in wpad.read_bytes():
         raise ValueError('Association-response patch is absent from compiled wpad')
+    if b'R15 service-only supervisor: read-only system API' not in (root / 'sbin/procd').read_bytes():
+        raise ValueError('Non-PID1 procd system-API guard absent from compiled binary')
     # Retain exact downloaded source archives for inspecting/rebuilding dependencies.
     sources = output / 'sources'
     sources.mkdir()
@@ -219,7 +221,7 @@ def collect(sdk, output):
               'scope': 'Wireless and management userspace; no board boot integration or kernel',
               'sdk_target': 'realtek/generic', 'package_architecture': 'mips_4kec',
               'soc_compatibility': 'ISA candidate for RTL8198D; driver/runtime compatibility unverified',
-              'association_patch_marker_present': True, 'packages': records, 'elf_files': elf}
+              'association_patch_marker_present': True, 'non_pid1_system_api_guard_marker_present': True, 'packages': records, 'elf_files': elf}
     result['root_packages'] = ROOT_PACKAGES
     result['system_accounts'] = accounts
     result['unverified_kernel_package_dependencies'] = sorted(external_kernel)

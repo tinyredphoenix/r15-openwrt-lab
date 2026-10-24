@@ -5,7 +5,7 @@ import sys
 
 
 def recipes(config, packageinfo):
-    selected = set(re.findall(r'^CONFIG_PACKAGE_([^=\n]+)=[ym]$', config, re.M))
+    selected = set(re.findall(r'^CONFIG_PACKAGE_([^=\n]+)=y$', config, re.M))
     source = None
     found = {}
     for line in packageinfo.splitlines():
