@@ -1,0 +1,15 @@
+--- a/libs/luci-lib-nixio/Makefile
++++ b/libs/luci-lib-nixio/Makefile
+@@ -47,7 +47,11 @@
+   LUCI_CFLAGS+=-I$(STAGING_DIR)/usr/include/cyassl
+ endif
+ 
+-MAKE_VARS += NIXIO_TLS="$(NIXIO_TLS)"
++# package-defaults.mk resets MAKE_VARS inside luci.mk. Export this independently.
++export NIXIO_TLS
++PKG_CONFIG_DEPENDS += CONFIG_PACKAGE_luci-lib-nixio_notls \
++	CONFIG_PACKAGE_luci-lib-nixio_axtls CONFIG_PACKAGE_luci-lib-nixio_cyassl \
++	CONFIG_PACKAGE_luci-lib-nixio_openssl
+ 
+ include ../../luci.mk
+ 

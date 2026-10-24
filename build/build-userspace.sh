@@ -59,6 +59,14 @@ if [[ ! -d "$LUCI_SOURCE/.git" ]]; then
     git -C "$LUCI_SOURCE" checkout -q --detach FETCH_HEAD
 fi
 [[ $(git -C "$LUCI_SOURCE" rev-parse HEAD) == "$LUCI_COMMIT" ]]
+NIXIO_RECIPE_CHANGED=0
+NIXIO_RECIPE_PATCH="$ROOT/patches/901-nixio-export-tls-provider.patch"
+if patch --dry-run --forward --fuzz=0 -p1 -d "$LUCI_SOURCE" < "$NIXIO_RECIPE_PATCH" >/dev/null 2>&1; then
+    patch --forward --fuzz=0 -p1 -d "$LUCI_SOURCE" < "$NIXIO_RECIPE_PATCH"
+    NIXIO_RECIPE_CHANGED=1
+elif ! patch --dry-run --reverse --fuzz=0 -p1 -d "$LUCI_SOURCE" < "$NIXIO_RECIPE_PATCH" >/dev/null 2>&1; then
+    echo 'Pinned nixio recipe does not match the reviewed TLS fix' >&2; exit 1
+fi
 # LuCI's cgi-io runtime helper lives in the separate packages feed.
 PACKAGES_SOURCE="$CACHE/packages-$PACKAGES_COMMIT"
 if [[ ! -d "$PACKAGES_SOURCE/.git" ]]; then
@@ -104,7 +112,7 @@ cat "$ROOT/artifacts/selected-recipes.txt"
 if [[ "$PATCH_CHANGED" == 1 ]]; then
     make -C "$SDK" package/network/services/hostapd/clean
 fi
-if [[ "$NIXIO_CHANGED" == 1 ]]; then
+if [[ "$NIXIO_CHANGED" == 1 || "$NIXIO_RECIPE_CHANGED" == 1 ]]; then
     make -C "$SDK" package/feeds/luci/luci-lib-nixio/clean
 fi
 if [[ "$PROCD_PATCH_CHANGED" == 1 ]]; then
@@ -120,6 +128,7 @@ done < "$ROOT/artifacts/selected-recipes.txt"
 python3 "$ROOT/build/collect-userspace.py" "$SDK" "$ROOT/artifacts"
 git -C "$LUCI_SOURCE" archive --format=tar.gz --prefix=luci/ "$LUCI_COMMIT" \
     > "$ROOT/artifacts/sources/luci-pinned-source.tar.gz"
+cp "$NIXIO_RECIPE_PATCH" "$ROOT/artifacts/sources/"
 git -C "$PACKAGES_SOURCE" archive --format=tar.gz --prefix=packages/ "$PACKAGES_COMMIT" net/cgi-io \
     > "$ROOT/artifacts/sources/cgi-io-pinned-recipe.tar.gz"
 python3 "$ROOT/build/stage-luci-radio.py" "$ROOT/artifacts/rootfs" "$ROOT/artifacts/luci-radio-staging.json"
