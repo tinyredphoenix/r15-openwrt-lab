@@ -14,6 +14,7 @@ signal and sysupgrade on ubus. A private socket or chroot alone does not make
 those methods harmless to the running host.
 
 Our patch retains only system.board and system.info when procd is not PID 1.
+Both the dispatched method table and its advertised ubus object type are restricted.
 PID 1 retains the original method table; this is not proof that an R15 custom
 boot or its update implementation works. The host regression test patches the
 actual pinned source, compiles its registration function/method tables with
