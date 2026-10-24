@@ -75,6 +75,11 @@ NIXIO_CHANGED=0
 if ! grep -qx 'CONFIG_PACKAGE_luci-lib-nixio_openssl=y' "$SDK/.config"; then NIXIO_CHANGED=1; fi
 cp "$ROOT/build/userspace.config" "$SDK/.config"
 make -C "$SDK" defconfig
+# The SDK defaults AUTOREMOVE=y, unlike the full OpenWrt build tree. It removes
+# compiled work after every package target, defeating incremental cache reuse.
+grep -qx '# CONFIG_AUTOREMOVE is not set' "$SDK/.config" || {
+    echo 'SDK automatic build-directory deletion must be disabled' >&2; exit 1;
+}
 for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
     CONFIG_PACKAGE_hostapd-utils=y CONFIG_PACKAGE_kmod-cfg80211=y \
     CONFIG_DRIVER_11N_SUPPORT=y CONFIG_DRIVER_11AC_SUPPORT=y \
