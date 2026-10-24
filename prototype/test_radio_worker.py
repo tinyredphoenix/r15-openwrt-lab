@@ -20,6 +20,7 @@ printf '%s\\n' "ubus $*" >> "$CALLS"
 case "$*" in
  *network.interface.mgmt*) printf '%s\\n' "$MGMT" ;;
  *add_device*) [ "$ATTACH_OK" = 1 ] ;;
+ *"network.interface.wwan up") [ "$DHCP_OK" = 1 ] ;;
 esac
 ''',
                 'jsonfilter': '#!/bin/sh\ncat\n',
@@ -45,13 +46,14 @@ esac
         calls, _ = self.run_scenario('handle_link connected; handle_link disconnected; handle_link connected')
         self.assertEqual(sum('add_device' in x for x in calls), 2)
         self.assertEqual(sum('remove_device' in x for x in calls), 1)
-        self.assertEqual(calls.count('ifup wwan'), 2)
-        self.assertEqual(calls.count('ifdown wwan'), 1)
+        self.assertEqual(calls.count('ubus -t 2 call network.interface.wwan up'), 2)
+        self.assertEqual(calls.count('ubus -t 2 call network.interface.wwan down'), 1)
         self.assertTrue(all('mgmt status' in x or 'wwan' in x for x in calls))
+        self.assertFalse(any('reload' in x or x.startswith(('ifup ', 'ifdown ')) for x in calls))
 
     def test_repeated_association_does_not_restart_dhcp(self):
         calls, _ = self.run_scenario('handle_link connected; handle_link connected')
-        self.assertEqual(calls.count('ifup wwan'), 1)
+        self.assertEqual(calls.count('ubus -t 2 call network.interface.wwan up'), 1)
 
     def test_missing_upstream_does_not_start_dhcp_or_change_networks(self):
         calls, _ = self.run_scenario('handle_link disconnected')
@@ -60,11 +62,11 @@ esac
     def test_failed_attachment_never_starts_dhcp_and_is_retryable(self):
         calls, _ = self.run_scenario('handle_link connected || :; handle_link connected || :', attach_ok=False)
         self.assertEqual(sum('add_device' in x for x in calls), 2)
-        self.assertNotIn('ifup wwan', calls)
+        self.assertNotIn('ubus -t 2 call network.interface.wwan up', calls)
 
     def test_failed_dhcp_detaches_only_uplink(self):
         calls, _ = self.run_scenario('handle_link connected || :', dhcp_ok=False)
-        self.assertIn('ifdown wwan', calls)
+        self.assertIn('ubus -t 2 call network.interface.wwan down', calls)
         self.assertTrue(any('remove_device' in x for x in calls))
 
     def test_management_failure_prevents_uplink_attachment(self):
@@ -73,8 +75,8 @@ esac
 
     def test_management_failure_after_attachment_detaches_only_uplink(self):
         calls, _ = self.run_scenario('handle_link connected; MGMT=false; handle_link connected')
-        self.assertIn('ifdown wwan', calls)
-        self.assertEqual(calls.count('ifup wwan'), 1)
+        self.assertIn('ubus -t 2 call network.interface.wwan down', calls)
+        self.assertEqual(calls.count('ubus -t 2 call network.interface.wwan up'), 1)
 
     def test_stale_completed_state_requires_carrier(self):
         _, stdout = self.run_scenario("""station_carrier() { echo 0; }

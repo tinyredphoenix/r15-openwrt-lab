@@ -19,6 +19,10 @@ class AccountTests(unittest.TestCase):
             self.assertTrue(all(line.split(':')[1] == '*' for line in (root/'etc/shadow').read_text().splitlines()))
             self.assertEqual((root/'etc/shadow').stat().st_mode & 0o777, 0o600)
             self.assertFalse(report['owner_ssh_key_provisioned'])
+            allowed_shells = (root/'etc/shells').read_text().splitlines()
+            accounts = [line.split(':') for line in (root/'etc/passwd').read_text().splitlines()]
+            self.assertIn(next(a[-1] for a in accounts if a[0] == 'root'), allowed_shells)
+            self.assertNotIn('/bin/false', allowed_shells)
 
     def test_privileged_conflicting_and_ambiguous_ids_rejected(self):
         for value in ('bad=0:bad=10', 'root=10:bad=10', 'bad=10:root=10',

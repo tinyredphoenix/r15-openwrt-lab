@@ -228,7 +228,7 @@ coordinate_tick() {
     fi
     REJOIN_WAIT=0
     handle_link connected || return 0
-    # ifup is asynchronous. Do not call it a ready link before DHCP/data checks.
+    # Interface setup is asynchronous. Do not call it a ready link before DHCP/data checks.
     READY=0
     if lease_up; then
         if ! lease_network_safe; then

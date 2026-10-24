@@ -137,6 +137,8 @@ def stage_accounts(metadata, root):
         'passwd': ''.join(f'{n}:x:{u}:{g}:{n}:{h}:{s}\n' for n, (u, g, h, s) in sorted(users.items())),
         'group': ''.join(f'{n}:x:{g}:\n' for n, g in sorted(groups.items())),
         'shadow': ''.join(f'{n}:*:0:0:99999:7:::\n' for n in sorted(users)),
+        # Dropbear rejects even key-only logins when the account shell is absent.
+        'shells': '/bin/ash\n/bin/sh\n',
     }
     for name in contents:
         dest = safe_path(root, 'etc/' + name)

@@ -22,7 +22,7 @@ valid_pair() {
 detach_uplink() {
     [ "$ATTACHED" = 1 ] || return 0
     # Never call network restart, wifi reload, or ifdown on mgmt/lan.
-    ifdown wwan >/dev/null 2>&1
+    ubus -t 2 call network.interface.wwan down >/dev/null 2>&1
     ubus -t 2 call network.interface.wwan remove_device \
         "{\"name\":\"$STA\"}" >/dev/null 2>&1
     ATTACHED=0
@@ -40,7 +40,8 @@ handle_link() {
         return 1
     fi
     ATTACHED=1
-    if ! ifup wwan >/dev/null 2>&1; then
+    # The ifup shell wrapper reloads all networks; use the scoped API instead.
+    if ! ubus -t 2 call network.interface.wwan up >/dev/null 2>&1; then
         detach_uplink
         rlog 'Could not start uplink DHCP; will retry'
         return 1

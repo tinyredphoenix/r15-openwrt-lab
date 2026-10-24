@@ -7,7 +7,7 @@ Observed stock firmware 1.06.10 uses RTL8198D, big-endian MIPS interAptiv, Linux
 ## What is implemented
 
 - A local configuration renderer with separate wired management, SSH keys and DHCP that does not replace the laptop's Internet route.
-- Radio lifecycle components: separate workers for cross-radio operation and a single paired controller for same-radio channel alignment, carrier/reassociation handling and netifd readiness. The new controller has offline tests only and does not restart wired management.
+- Radio lifecycle components: separate workers for cross-radio operation and a single paired controller for same-radio channel alignment, carrier/reassociation handling and netifd readiness. The controller has passed bounded native 5 GHz RAM integration on the retained OEM kernel/drivers; it uses interface-specific netifd calls without a global network reload.
 - A read-only health probe for uptime, memory, Ethernet/Wi-Fi packet counters, exposed LED devices and voltage sensors. Missing sensors remain unknown; LED control and antenna-chain testing still require board verification.
 - A read-only checker for the observed decrypted stock image's inner record lengths and checksums. It rejects corruption without claiming authenticity or flash compatibility; it always reports `flashable: false`.
 - A pinned Linux SDK build for patched wireless tools and the management foundation: BusyBox, procd, ubus, UCI, netifd, Dropbear, dnsmasq and jsonfilter.
@@ -60,6 +60,34 @@ Original project glue is MIT licensed; imported hostapd patch retains BSD-3-Clau
 
 ## Radio integration status
 
-Private owner-authorized tests separately qualified bounded 5 GHz and 2.4 GHz routed repeating on the stock kernel/vendor drivers, using compiled station and DHCP/DNS tools with OEM AP services. An AP restart exposed a channel-selection/carrier failure, corrected manually in that experiment. The [same-radio coordinator](requirements/RADIO-COORDINATION.md) now models that recovery in code and renders a single-owner service. No private credentials, router captures or calibration data are included here. Full custom boot and target execution of the coordinator remain untested.
+Private owner-authorized tests separately qualified bounded 5 GHz and 2.4 GHz routed repeating on the stock kernel/vendor drivers, using compiled station and DHCP/DNS tools with OEM AP services. An AP restart exposed a channel-selection/carrier failure, corrected manually in that experiment. The [same-radio coordinator](requirements/RADIO-COORDINATION.md) now models that recovery in code and renders a single-owner service. No private credentials, router captures or calibration data are included here. The production coordinator has since passed bounded 5 GHz RAM execution with our AP and station daemons, UCI rendering, initial automatic channel alignment, netifd DHCP and radio-bound Internet traffic. A phone received DHCP/DNS and forwarded Internet traffic through our AP and compiled iptables rules. Full custom boot remains untested.
 
 Final management direction: [OpenWrt administration](requirements/OPENWRT-MANAGEMENT.md) replaces the OEM interface. LuCI/RPC/HTTPS and optional PPPoE are being added to the cached build; radio UI integration and actual target startup remain unqualified. No private administrative credentials are published.
+
+## Native integration status (2026-10-24)
+
+The 5 GHz RAM experiment now uses our hostapd, supplicant, production UCI/coordinator,
+netifd, dnsmasq and legacy iptables, with the exact stock kernel, radio drivers and
+stock board initialization retained. Initial SSID-based channel alignment, WPA2/CCMP,
+uplink DHCP, ten radio-bound Internet ping replies and a phone's DHCP/DNS/NAT path
+passed. Three upstream reconnect cycles each passed ten interface-bound ping replies.
+A phone completed 100 MB download and 100 MB upload with mobile data disabled;
+R15 forwarding counters corroborated the radio path. Wired management remained
+accessible and cleanup restored stock services. The client runner ended on a
+termination signal, so these individual checks are recorded separately from its exit status.
+The private evidence and per-unit settings are kept off this repository.
+
+This is a bounded integration result, not an R15 firmware image or a modern-kernel
+port. The test AP used 20 MHz 802.11n; 802.11ac/ax AP operation, live upstream channel
+migration, multi-day stability and custom boot remain
+separate qualifications. The 2.4 GHz production coordinator/client path has also passed phone WPA2
+authentication, DHCP and a reported 100 MB transfer in each direction, corroborated
+by forwarding counters. Three upstream reconnect cycles each passed ten interface-bound ping replies;
+full cleanup returned zero and restored the stock AP and DHCP service. In-place AP
+password reload was unreliable; a fresh controller session with the selected key
+worked. Live settings application remains a separate qualification.
+
+Key-only SSH passed after staging `/etc/shells`. GUI password authentication is
+currently deferred, not removed or exposed without authentication. The account
+collector now writes accepted login shells. Radio workers use only the WWAN ubus
+up/down methods because the generic `ifup` wrapper reloads all network configuration.
