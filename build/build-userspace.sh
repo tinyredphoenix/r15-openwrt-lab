@@ -81,6 +81,13 @@ printf 'src-link luci %s\nsrc-link packages %s\n' "$LUCI_SOURCE" "$PACKAGES_SOUR
     ./scripts/feeds install -p packages cgi-io && ./scripts/feeds install -a -p luci)
 NIXIO_CHANGED=0
 if ! grep -qx 'CONFIG_PACKAGE_luci-lib-nixio_openssl=y' "$SDK/.config"; then NIXIO_CHANGED=1; fi
+# NAND_SUPPORT is a hidden target capability: a .config assignment alone is
+# dropped by Kconfig on this switch SDK. Select it through our userspace-only
+# profile; do not import or build the SDK board's kernel/base-files.
+cp "$ROOT/build/r15-userspace.in" "$SDK/.r15-userspace.in"
+if ! grep -qx 'source ".r15-userspace.in"' "$SDK/Config.in"; then
+    printf '\nsource ".r15-userspace.in"\n' >> "$SDK/Config.in"
+fi
 cp "$ROOT/build/userspace.config" "$SDK/.config"
 make -C "$SDK" defconfig
 # The SDK defaults AUTOREMOVE=y, unlike the full OpenWrt build tree. It removes
@@ -99,7 +106,7 @@ for symbol in CONFIG_PACKAGE_wpad-basic=y CONFIG_PACKAGE_wpa-cli=y \
     CONFIG_PACKAGE_uhttpd=y CONFIG_PACKAGE_rpcd=y CONFIG_PACKAGE_libustream-openssl=y \
     CONFIG_PACKAGE_cgi-io=y CONFIG_PACKAGE_luci-compat=y CONFIG_PACKAGE_libuci-lua=y \
     CONFIG_PACKAGE_luci-lib-nixio_openssl=y CONFIG_PACKAGE_fstools=y CONFIG_PACKAGE_fwtool=y \
-    CONFIG_PACKAGE_opkg=y CONFIG_PACKAGE_ubi-utils=y CONFIG_NAND_SUPPORT=y CONFIG_FSTOOLS_UBIFS_EXTROOT=y; do
+    CONFIG_PACKAGE_opkg=y CONFIG_PACKAGE_ubi-utils=y CONFIG_R15_VENDOR_NAND=y CONFIG_NAND_SUPPORT=y CONFIG_FSTOOLS_UBIFS_EXTROOT=y; do
     grep -qx "$symbol" "$SDK/.config" || { echo "Missing build setting: $symbol" >&2; exit 1; }
 done
 python3 "$ROOT/build/selected-recipes.py" "$SDK" > "$ROOT/artifacts/selected-recipes.txt"

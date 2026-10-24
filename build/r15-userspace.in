@@ -1,0 +1,6 @@
+# SDK metadata only: compile NAND userspace for the actual retained R15 kernel.
+# This does not select or build the SDK's unrelated board kernel or image.
+config R15_VENDOR_NAND
+	bool "R15 retained-kernel NAND userspace"
+	default y
+	select NAND_SUPPORT
